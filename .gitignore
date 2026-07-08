@@ -1,0 +1,18 @@
+# Keil MDK
+MDK-ARM/Objects/
+MDK-ARM/Listings/
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.dep
+**/DebugConfig/
+*.bak
+*.orig
+*.lx
+# JLink
+JLink*.txt
+JLink*.log
+# IDE
+.vscode/
+.idea/
+# System
+.DS_Store
+Thumbs.db
