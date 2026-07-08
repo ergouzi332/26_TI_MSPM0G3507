@@ -8,7 +8,7 @@ static volatile uint32_t enc_pulses = 0;
 #define PID_Kp              1.4f
 #define PID_Ki              0.6f
 #define PID_Kd              0.0f
-#define MIN_PWM_DUTY        80
+#define MIN_PWM_DUTY        60
 
 
 static int16_t target_rpm = 0;
@@ -94,10 +94,10 @@ void Motor_SpeedUpdate(void)
 
         /* ???????? 10 RPM */
         if (soft_target < (float)target_rpm) {
-            soft_target += 45.0f;
+            soft_target += 40.0f;
             if (soft_target > (float)target_rpm) soft_target = (float)target_rpm;
         } else if (soft_target > (float)target_rpm) {
-            soft_target -= 45.0f;
+            soft_target -= 40.0f;
             if (soft_target < (float)target_rpm) soft_target = (float)target_rpm;
         }
         float err = soft_target - smooth_rpm;
@@ -111,7 +111,7 @@ void Motor_SpeedUpdate(void)
         if (target_rpm > 0 && smooth_rpm < 5.0f && output < (float)MIN_PWM_DUTY)
             output = (float)MIN_PWM_DUTY;
 
-        if (!saturated_up) {
+        if (!saturated_up && smooth_rpm > 20) {
             pid_integral += err * 0.1f;
             float max_int = 1000.0f / PID_Ki;
             if (pid_integral > max_int) pid_integral = max_int;
