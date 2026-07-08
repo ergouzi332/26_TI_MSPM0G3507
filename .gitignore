@@ -16,3 +16,6 @@ JLink*.log
 # System
 .DS_Store
 Thumbs.db
+
+# Build outputs
+*.map
