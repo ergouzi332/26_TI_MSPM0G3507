@@ -123,6 +123,22 @@ extern "C" {
 
 
 
+
+/* Defines for MPU_I2C0 */
+#define MPU_I2C0_INST                                                       I2C0
+#define MPU_I2C0_INST_IRQHandler                                 I2C0_IRQHandler
+#define MPU_I2C0_INST_INT_IRQN                                     I2C0_INT_IRQn
+#define MPU_I2C0_BUS_SPEED_HZ                                             100000
+#define GPIO_MPU_I2C0_SDA_PORT                                             GPIOA
+#define GPIO_MPU_I2C0_SDA_PIN                                      DL_GPIO_PIN_0
+#define GPIO_MPU_I2C0_IOMUX_SDA                                   (IOMUX_PINCM1)
+#define GPIO_MPU_I2C0_IOMUX_SDA_FUNC                    IOMUX_PINCM1_PF_I2C0_SDA
+#define GPIO_MPU_I2C0_SCL_PORT                                             GPIOA
+#define GPIO_MPU_I2C0_SCL_PIN                                      DL_GPIO_PIN_1
+#define GPIO_MPU_I2C0_IOMUX_SCL                                   (IOMUX_PINCM2)
+#define GPIO_MPU_I2C0_IOMUX_SCL_FUNC                    IOMUX_PINCM2_PF_I2C0_SCL
+
+
 /* Defines for UART_3 */
 #define UART_3_INST                                                        UART3
 #define UART_3_INST_FREQUENCY                                           32000000
@@ -201,15 +217,6 @@ extern "C" {
 /* Defines for OLED_SDA: GPIOA.16 with pinCMx 38 on package pin 31 */
 #define OLED_OLED_SDA_PIN                                       (DL_GPIO_PIN_16)
 #define OLED_OLED_SDA_IOMUX                                      (IOMUX_PINCM38)
-/* Port definition for Pin Group MPU6050 */
-#define MPU6050_PORT                                                     (GPIOA)
-
-/* Defines for MPU6050_SCL: GPIOA.1 with pinCMx 2 on package pin 2 */
-#define MPU6050_MPU6050_SCL_PIN                                  (DL_GPIO_PIN_1)
-#define MPU6050_MPU6050_SCL_IOMUX                                 (IOMUX_PINCM2)
-/* Defines for MPU6050_SDA: GPIOA.0 with pinCMx 1 on package pin 1 */
-#define MPU6050_MPU6050_SDA_PIN                                  (DL_GPIO_PIN_0)
-#define MPU6050_MPU6050_SDA_IOMUX                                 (IOMUX_PINCM1)
 
 
 /* clang-format on */
@@ -221,6 +228,7 @@ void SYSCFG_DL_SYSCTL_init(void);
 void SYSCFG_DL_PWM_0_init(void);
 void SYSCFG_DL_CAPTURE_A_init(void);
 void SYSCFG_DL_CAPTURE_B_init(void);
+void SYSCFG_DL_MPU_I2C0_init(void);
 void SYSCFG_DL_UART_3_init(void);
 
 

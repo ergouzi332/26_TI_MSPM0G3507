@@ -1,4 +1,4 @@
-﻿#ifndef MPU6050_H
+#ifndef MPU6050_H
 #define MPU6050_H
 
 #include <stdint.h>
@@ -16,16 +16,24 @@ typedef struct
 void MPU6050_Init(void);
 void MPU6050_UpdateAttitude(float dt);
 float MPU6050_GetYaw(void);
+float MPU6050_GetGzOffset(void);
 void MPU6050_WriteReg(uint8_t reg, uint8_t dat);
 uint8_t MPU6050_ReadReg(uint8_t reg);
 int mpu6050_detect(void);
 int MPU6050_IsPresent(void);
 uint8_t MPU6050_GetWhoAmI(void);
 uint8_t MPU6050_GetLastStatus(void);
-uint8_t MPU6050_ScanFirstAddress(void);
 uint8_t MPU6050_GetScanAddress(void);
 void MPU6050_GetRawData(MPU_RawData *out);
 void MPU6050_UpdateYawFast(float dt);
+void MPU6050_UpdateYawFromRaw(int16_t gz_raw, float dt);
+void MPU6050_CalibrateGyro(void);
+float MPU6050_GetDps(void);
+int32_t MPU6050_GetDps100(void);
+uint8_t MPU6050_HwScan(void);
+int16_t MPU6050_Test(void);
+int16_t MPU6050_ReadGZ(void);
+uint8_t MPU6050_DebugWho(void);
+uint8_t MPU6050_DebugWhoAt(uint8_t addr);
 
 #endif
-
