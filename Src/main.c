@@ -1,57 +1,81 @@
-#include "../HardWare/Hardware.h"
-#include "../HardWare/OLED.h"
-#include "../HardWare/MPU6050.h"
+ï»¿#include "OLED.h"
+#include "MPU6050.h"
+#include "MOTOR.h"
+#include "ENCODER.h"
+#include "GRAYSCALE.h"
+#include "BUZZER.h"
 #include "ti_msp_dl_config.h"
+
+volatile uint32_t tick_ms = 0;
+void SysTick_Handler(void) { tick_ms++; }
 
 int main(void)
 {
     SYSCFG_DL_init();
-    OLED_Init();
+    SysTick_Config(32000000 / 1000);
 
+    OLED_Init();
     MPU6050_Init();
+    MPU6050_CalibrateGyro();
+    Motor_Init();
+    Encoder_Init();
+    Grayscale_Init();
+    Buzzer_Init();
 
     OLED_Clear();
-    OLED_WriteString(0, 0, "RAW:");
-    OLED_WriteString(0, 1, "DPS:");
-    OLED_WriteString(0, 2, "YAW:");
+    OLED_WriteString(0, 0, "RDY");
+    float off = MPU6050_GetGzOffset();
+    OLED_WriteString(0, 1, "O:");
+    if (off < 0) { OLED_WriteString(24, 1, "-"); off = -off; }
+    OLED_WriteNum(32, 1, (uint32_t)off, 5);
+    OLED_WriteString(0, 2, "Y:");
+    OLED_WriteNum(24, 2, 0, 4);
+    OLED_WriteString(56, 2, ".0");
 
-
+    uint32_t t_last_imu = 0, t50 = 0, t200 = 0;
+    float yaw = 0.0f;
 
     while (1)
     {
-        int16_t gz = MPU6050_ReadGZ();
-        float gz_dps = (float)gz * 250.0f / 32768.0f;
+        uint32_t now = tick_ms;
 
-        /* µ÷ÓÃ±ê×¼ API ¸üÐÂ YAW£¨°üº¬ gz_offset ²¹³¥ºÍ»ý·Ö£© */
-        MPU6050_UpdateYawFromRaw(gz, 0.01f);
-        float yaw_val = MPU6050_GetYaw();
+        /* ========== 10ms ä»»åŠ¡ï¼šIMU + ç¼–ç å™¨ ========== */
+        if (now - t_last_imu >= 10)
+        {
+            float dt = (float)(now - t_last_imu) / 1000.0f;
+            t_last_imu = now;
+            int16_t gz = MPU6050_ReadGZ();
+            MPU6050_UpdateYawFromRaw(gz, dt);
+            yaw = MPU6050_GetYaw();
+        }
 
-        /* Line 0: RAW */
-        OLED_WriteString(24, 0, "         ");
-        int16_t gz_abs = gz;
-        if (gz_abs < 0) { OLED_WriteString(24, 0, "-"); gz_abs = -gz_abs; }
-        OLED_WriteNum(32, 0, (uint32_t)gz_abs, 5);
+        /* ========== 50ms ä»»åŠ¡ï¼šæŽ§åˆ¶è®¡ç®— ========== */
+        if (now - t50 >= 50)
+        {
+            t50 = now;
+            /* TODO: å¾ªè¿¹ PID + ç”µæœºæŽ§åˆ¶ */
+        }
 
-        /* Line 1: DPS + OFFSET µ÷ÊÔ */
-        int32_t d100 = (int32_t)(gz_dps * 100.0f);
-        OLED_WriteString(24, 1, "          ");
-        if (d100 < 0) { OLED_WriteString(24, 1, "-"); d100 = -d100; }
-        OLED_WriteNum(32, 1, (uint32_t)(d100 / 100), 3);
-        OLED_WriteString(50, 1, ".");
-        OLED_WriteNum(56, 1, (uint32_t)(d100 % 100), 2);
+        /* ========== 200ms ä»»åŠ¡ï¼šOLED æ˜¾ç¤º ========== */
+        if (now - t200 >= 200)
+        {
+            t200 = now;
 
-        /* Line 2: YAW */
-        OLED_WriteString(24, 2, "          ");
-        float yaw_disp = yaw_val;
-        if (yaw_disp < 0) { OLED_WriteString(24, 2, "-"); yaw_disp = -yaw_disp; }
-        uint32_t yi = (uint32_t)yaw_disp;
-        uint32_t yd = (uint32_t)((yaw_disp - yi) * 100.0f + 0.5f);
-        if (yd > 99) yd = 99;
-        OLED_WriteNum(32, 2, yi, 3);
-        OLED_WriteString(50, 2, ".");
-        OLED_WriteNum(56, 2, yd, 2);
+            float y = yaw;
+            uint8_t sign = 0;
+            if (y < 0) { sign = 1; y = -y; }
+            int16_t yi = (int16_t)y;
+            uint8_t yd = (uint8_t)((y - (float)yi) * 10.0f + 0.5f);
+            OLED_WriteString(0, 2, "Y:");
+            if (sign) OLED_WriteString(24, 2, "-");
+            OLED_WriteNum(32, 2, (uint32_t)yi, 3);
+            OLED_WriteString(56, 2, ".");
+            OLED_WriteNum(64, 2, (uint32_t)yd, 1);
 
-        DL_Common_delayCycles(320000U);
+            int16_t gz = MPU6050_GetLastGz();
+            OLED_WriteString(0, 4, "G:");
+            if (gz < 0) { OLED_WriteString(24, 4, "-"); gz = -gz; }
+            OLED_WriteNum(32, 4, (uint32_t)gz, 5);
+        }
     }
 }
-

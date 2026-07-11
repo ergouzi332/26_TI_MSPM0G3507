@@ -1,25 +1,25 @@
-/* OLED driver (SSD1306) using software I2C bit-bang on PA15/PA16
+﻿/* OLED driver (SSD1306) using software I2C bit-bang on PA15/PA16
  * PA15 = SCL, PA16 = SDA
- * 由于板上硬件 I2C 线路异常，改为 GPIO 模拟 I2C 通信
- * 适配MSPM0G3507，SysConfig已预先将PA15/PA16配置为Digital Output
- * 修复点：删除浮空输出、读写SDA动态切换输入输出、不覆盖SysConfig引脚配置
+ * 鐢变簬鏉夸笂纭欢 I2C 绾胯矾寮傚父锛屾敼涓?GPIO 妯℃嫙 I2C 閫氫俊
+ * 閫傞厤MSPM0G3507锛孲ysConfig宸查鍏堝皢PA15/PA16閰嶇疆涓篋igital Output
+ * 淇鐐癸細鍒犻櫎娴┖杈撳嚭銆佽鍐橲DA鍔ㄦ€佸垏鎹㈣緭鍏ヨ緭鍑恒€佷笉瑕嗙洊SysConfig寮曡剼閰嶇疆
  */
 #include "OLED.h"
 #include "ti_msp_dl_config.h"
 #include <string.h>
 
-// SSD1306 OLED I2C设备地址，多数0.96寸屏为0x3C，部分屏为0x3D
+// SSD1306 OLED I2C璁惧鍦板潃锛屽鏁?.96瀵稿睆涓?x3C锛岄儴鍒嗗睆涓?x3D
 #define SSD1306_ADDR 0x3C
-// I2C通信控制字节：00代表后续发送命令，40代表后续发送显存数据
+// I2C閫氫俊鎺у埗瀛楄妭锛?0浠ｈ〃鍚庣画鍙戦€佸懡浠わ紝40浠ｈ〃鍚庣画鍙戦€佹樉瀛樻暟鎹?
 #define SSD1306_CONTROL_CMD  0x00
 #define SSD1306_CONTROL_DATA 0x40
 
 /**
- * @brief 6x8 ASCII标准点阵字库
- * 偏移32对应空格开始，每个字符占用6字节纵向点阵，仅支持ASCII 32~127
+ * @brief 6x8 ASCII鏍囧噯鐐归樀瀛楀簱
+ * 鍋忕Щ32瀵瑰簲绌烘牸寮€濮嬶紝姣忎釜瀛楃鍗犵敤6瀛楄妭绾靛悜鐐归樀锛屼粎鏀寔ASCII 32~127
  */
 static const unsigned char F6X8[] = {
-0x00,0x00,0x00,0x00,0x00,0x00,// 空格 32
+0x00,0x00,0x00,0x00,0x00,0x00,// 绌烘牸 32
 0x00,0x00,0x5F,0x00,0x00,0x00,// !    33
 0x00,0x07,0x00,0x07,0x00,0x00,// "    34
 0x14,0x7F,0x14,0x7F,0x14,0x00,// #    35
@@ -80,73 +80,73 @@ static const unsigned char F6X8[] = {
 0x61,0x51,0x49,0x45,0x43,0x00 // Z    90
 };
 
-/*I2C时序延时函数，适配32MHz系统时钟*/
+/*I2C鏃跺簭寤舵椂鍑芥暟锛岄€傞厤32MHz绯荤粺鏃堕挓*/
 static void oled_delay(void)
 {
     volatile uint32_t i = 120;
     while (i--) {}
 }
 
-/*SCL引脚拉低（PA15，推挽输出，全程不关闭输出使能）*/
+/*SCL寮曡剼鎷変綆锛圥A15锛屾帹鎸借緭鍑猴紝鍏ㄧ▼涓嶅叧闂緭鍑轰娇鑳斤級*/
 static void oled_scl_low(void)
 {
     DL_GPIO_clearPins(GPIOA, OLED_OLED_SCL_PIN);
 }
 
-/*SCL引脚拉高（PA15，推挽输出强驱动高电平，无浮空）*/
+/*SCL寮曡剼鎷夐珮锛圥A15锛屾帹鎸借緭鍑哄己椹卞姩楂樼數骞筹紝鏃犳诞绌猴級*/
 static void oled_scl_high(void)
 {
     DL_GPIO_setPins(GPIOA, OLED_OLED_SCL_PIN);
 }
 
-/*SDA引脚拉低（PA16，推挽输出）*/
+/*SDA寮曡剼鎷変綆锛圥A16锛屾帹鎸借緭鍑猴級*/
 static void oled_sda_low(void)
 {
     DL_GPIO_clearPins(GPIOA, OLED_OLED_SDA_PIN);
 }
 
-/*SDA引脚拉高（PA16，推挽输出强驱动高电平）*/
+/*SDA寮曡剼鎷夐珮锛圥A16锛屾帹鎸借緭鍑哄己椹卞姩楂樼數骞筹級*/
 static void oled_sda_high(void)
 {
     DL_GPIO_setPins(GPIOA, OLED_OLED_SDA_PIN);
 }
 
 /**
- * @brief 读取SDA电平，用于获取从机应答ACK
- * @retval 1：高电平无应答；0：低电平正常应答
- * @note 发送时SDA为输出，读应答临时切换带上拉输入，读完切回输出
+ * @brief 璇诲彇SDA鐢靛钩锛岀敤浜庤幏鍙栦粠鏈哄簲绛擜CK
+ * @retval 1锛氶珮鐢靛钩鏃犲簲绛旓紱0锛氫綆鐢靛钩姝ｅ父搴旂瓟
+ * @note 鍙戦€佹椂SDA涓鸿緭鍑猴紝璇诲簲绛斾复鏃跺垏鎹㈠甫涓婃媺杈撳叆锛岃瀹屽垏鍥炶緭鍑?
  */
 static uint8_t oled_sda_read(void)
 {
     uint8_t val;
-    // 临时切换为带上拉输入，读取从机电平
+    // 涓存椂鍒囨崲涓哄甫涓婃媺杈撳叆锛岃鍙栦粠鏈虹數骞?
     DL_GPIO_initDigitalInputFeatures(OLED_OLED_SDA_IOMUX,
         DL_GPIO_INVERSION_DISABLE, DL_GPIO_RESISTOR_PULL_UP,
         DL_GPIO_HYSTERESIS_DISABLE, DL_GPIO_WAKEUP_DISABLE);
     oled_delay();
-    // DL_GPIO_readPins(端口, 引脚掩码) 两个参数缺一不可
+    // DL_GPIO_readPins(绔彛, 寮曡剼鎺╃爜) 涓や釜鍙傛暟缂轰竴涓嶅彲
     val = (DL_GPIO_readPins(GPIOA, OLED_OLED_SDA_PIN) != 0) ? 1 : 0;
-    // 恢复为SysConfig配置的数字输出模式
+    // 鎭㈠涓篠ysConfig閰嶇疆鐨勬暟瀛楄緭鍑烘ā寮?
     DL_GPIO_initDigitalOutput(OLED_OLED_SDA_IOMUX);
     return val;
 }
 
 /**
- * @brief 软件I2C引脚初始化
- * @note SysConfig已配置PA15/PA16为Digital Output，此处仅设置空闲高电平，不修改引脚模式
+ * @brief 杞欢I2C寮曡剼鍒濆鍖?
+ * @note SysConfig宸查厤缃甈A15/PA16涓篋igital Output锛屾澶勪粎璁剧疆绌洪棽楂樼數骞筹紝涓嶄慨鏀瑰紩鑴氭ā寮?
  */
 static void oled_i2c_init_gpio(void)
 {
-    // 强制释放I2C总线，恢复空闲高电平
+    // 寮哄埗閲婃斁I2C鎬荤嚎锛屾仮澶嶇┖闂查珮鐢靛钩
     oled_sda_high();
     oled_delay();
     oled_scl_high();
-    // 加长等待，等待OLED总线恢复
+    // 鍔犻暱绛夊緟锛岀瓑寰匫LED鎬荤嚎鎭㈠
     for(uint16_t t=0;t<5000;t++) oled_delay();
 }
 
 /**
- * @brief I2C起始信号：SDA高→低，SCL保持高
+ * @brief I2C璧峰淇″彿锛歋DA楂樷啋浣庯紝SCL淇濇寔楂?
  */
 static void oled_i2c_start(void)
 {
@@ -160,7 +160,7 @@ static void oled_i2c_start(void)
 }
 
 /**
- * @brief I2C停止信号：SCL高时，SDA低→高
+ * @brief I2C鍋滄淇″彿锛歋CL楂樻椂锛孲DA浣庘啋楂?
  */
 static void oled_i2c_stop(void)
 {
@@ -173,8 +173,8 @@ static void oled_i2c_stop(void)
 }
 
 /**
- * @brief I2C发送单bit
- * @param bit 待发送位 0/1
+ * @brief I2C鍙戦€佸崟bit
+ * @param bit 寰呭彂閫佷綅 0/1
  */
 static void oled_i2c_write_bit(uint8_t bit)
 {
@@ -190,8 +190,8 @@ static void oled_i2c_write_bit(uint8_t bit)
 }
 
 /**
- * @brief 等待OLED从机应答信号
- * @retval 1：收到ACK应答；0：无应答通信异常
+ * @brief 绛夊緟OLED浠庢満搴旂瓟淇″彿
+ * @retval 1锛氭敹鍒癆CK搴旂瓟锛?锛氭棤搴旂瓟閫氫俊寮傚父
  */
 static uint8_t oled_i2c_wait_ack(void)
 {
@@ -207,12 +207,12 @@ static uint8_t oled_i2c_wait_ack(void)
 }
 
 /**
- * @brief I2C发送1字节数据，发送后自动等待ACK
- * @param byte 待发送单字节
+ * @brief I2C鍙戦€?瀛楄妭鏁版嵁锛屽彂閫佸悗鑷姩绛夊緟ACK
+ * @param byte 寰呭彂閫佸崟瀛楄妭
  */
 static void oled_i2c_send_byte(uint8_t byte)
 {
-    // 高位先发
+    // 楂樹綅鍏堝彂
     for (uint8_t i = 0; i < 8; i++)
     {
         oled_i2c_write_bit((byte & 0x80) ? 1 : 0);
@@ -222,14 +222,14 @@ static void oled_i2c_send_byte(uint8_t byte)
 }
 
 /**
- * @brief I2C原始批量发送函数
- * @param buf 发送数据缓冲区
- * @param len 数据字节长度
+ * @brief I2C鍘熷鎵归噺鍙戦€佸嚱鏁?
+ * @param buf 鍙戦€佹暟鎹紦鍐插尯
+ * @param len 鏁版嵁瀛楄妭闀垮害
  */
 static void oled_write_raw(uint8_t *buf, uint16_t len)
 {
     oled_i2c_start();
-    // 设备写地址 (ADDR << 1 | 0 代表写操作)
+    // 璁惧鍐欏湴鍧€ (ADDR << 1 | 0 浠ｈ〃鍐欐搷浣?
     oled_i2c_send_byte((SSD1306_ADDR << 1) | 0x00);
     for (uint16_t i = 0; i < len; i++)
     {
@@ -239,9 +239,9 @@ static void oled_write_raw(uint8_t *buf, uint16_t len)
 }
 
 /**
- * @brief 向SSD1306发送寄存器配置命令
- * @param cmd OLED寄存器命令码
- * @retval 固定返回0，无错误处理
+ * @brief 鍚慡SD1306鍙戦€佸瘎瀛樺櫒閰嶇疆鍛戒护
+ * @param cmd OLED瀵勫瓨鍣ㄥ懡浠ょ爜
+ * @retval 鍥哄畾杩斿洖0锛屾棤閿欒澶勭悊
  */
 static int OLED_WriteCommand(uint8_t cmd)
 {
@@ -251,24 +251,24 @@ static int OLED_WriteCommand(uint8_t cmd)
 }
 
 /**
- * @brief 向OLED显存批量写入点阵显示数据
- * @param data 点阵数据指针
- * @param len 数据长度
- * @retval 0 执行完成
- * @note 超过240字节自动分包发送，防止栈溢出
+ * @brief 鍚慜LED鏄惧瓨鎵归噺鍐欏叆鐐归樀鏄剧ず鏁版嵁
+ * @param data 鐐归樀鏁版嵁鎸囬拡
+ * @param len 鏁版嵁闀垮害
+ * @retval 0 鎵ц瀹屾垚
+ * @note 瓒呰繃240瀛楄妭鑷姩鍒嗗寘鍙戦€侊紝闃叉鏍堟孩鍑?
  */
 static int OLED_WriteData(const uint8_t* data, int len)
 {
 	if (len <= 0) return 0;
-	uint8_t tmp[256];
-	// 数据较短一次性发送
+	static uint8_t tmp[256];
+	// 鏁版嵁杈冪煭涓€娆℃€у彂閫?
 	if (len + 1 <= (int)sizeof(tmp)) {
 		tmp[0] = SSD1306_CONTROL_DATA;
 		memcpy(&tmp[1], data, len);
 		oled_write_raw(tmp, len + 1);
 		return 0;
 	}
-	// 长数据分片发送
+	// 闀挎暟鎹垎鐗囧彂閫?
 	int sent = 0;
 	while (sent < len) {
 		int chunk = (len - sent > 240) ? 240 : (len - sent);
@@ -281,19 +281,19 @@ static int OLED_WriteData(const uint8_t* data, int len)
 }
 
 /**
- * @brief OLED屏幕初始化完整流程
- * @note 标准SSD1306 128*64初始化序列，包含时钟、分辨率、充电泵、对比度、扫描方向配置
- * @warning 主函数必须先执行SYSCFG_DL_init()再调用OLED_Init()
+ * @brief OLED灞忓箷鍒濆鍖栧畬鏁存祦绋?
+ * @note 鏍囧噯SSD1306 128*64鍒濆鍖栧簭鍒楋紝鍖呭惈鏃堕挓銆佸垎杈ㄧ巼銆佸厖鐢垫车銆佸姣斿害銆佹壂鎻忔柟鍚戦厤缃?
+ * @warning 涓诲嚱鏁板繀椤诲厛鎵цSYSCFG_DL_init()鍐嶈皟鐢∣LED_Init()
  */
 void OLED_Init(void)
 {
     oled_i2c_init_gpio();
-    // 新增：发送停止信号解锁总线
+    // 鏂板锛氬彂閫佸仠姝俊鍙疯В閿佹€荤嚎
     oled_i2c_stop();
     oled_delay();
 
-    OLED_WriteCommand(0xAE); // 关闭显示
-    // 后面原有初始化命令不变
+    OLED_WriteCommand(0xAE); // 鍏抽棴鏄剧ず
+    // 鍚庨潰鍘熸湁鍒濆鍖栧懡浠や笉鍙?
     OLED_WriteCommand(0xD5); OLED_WriteCommand(0x80);
     OLED_WriteCommand(0xA8); OLED_WriteCommand(0x3F);
     OLED_WriteCommand(0xD3); OLED_WriteCommand(0x00);
@@ -309,30 +309,30 @@ void OLED_Init(void)
     OLED_WriteCommand(0xA4);
     OLED_WriteCommand(0xA6);
     OLED_Clear();
-    OLED_WriteCommand(0xAF); // 开启显示
+    OLED_WriteCommand(0xAF); // 寮€鍚樉绀?
 }
 
 
 /**
- * @brief 全屏清屏，所有像素熄灭
- * @note 128*64屏幕分为8页，每页8行像素，逐页填充0
+ * @brief 鍏ㄥ睆娓呭睆锛屾墍鏈夊儚绱犵唲鐏?
+ * @note 128*64灞忓箷鍒嗕负8椤碉紝姣忛〉8琛屽儚绱狅紝閫愰〉濉厖0
  */
 void OLED_Clear(void)
 {
-	uint8_t zeros[128];
-	memset(zeros, 0x00, sizeof(zeros));
+	static const uint8_t zeros[128] = {0};
+	
 	for (uint8_t page = 0; page < 8; page++) {
-		OLED_WriteCommand(0xB0 | page); // 设置页地址
-		OLED_WriteCommand(0x00);        // 列低4位
-		OLED_WriteCommand(0x10);        // 列高4位
+		OLED_WriteCommand(0xB0 | page); // 璁剧疆椤靛湴鍧€
+		OLED_WriteCommand(0x00);        // 鍒椾綆4浣?
+		OLED_WriteCommand(0x10);        // 鍒楅珮4浣?
 		OLED_WriteData(zeros, sizeof(zeros));
 	}
 }
 
 /**
- * @brief 设置字符显示坐标
- * @param x 横向像素坐标 0~127
- * @param y 纵向页号 0~7（每页8像素高度）
+ * @brief 璁剧疆瀛楃鏄剧ず鍧愭爣
+ * @param x 妯悜鍍忕礌鍧愭爣 0~127
+ * @param y 绾靛悜椤靛彿 0~7锛堟瘡椤?鍍忕礌楂樺害锛?
  */
 static void OLED_SetPos(uint8_t x, uint8_t y)
 {
@@ -342,11 +342,11 @@ static void OLED_SetPos(uint8_t x, uint8_t y)
 }
 
 /**
- * @brief 指定坐标打印ASCII字符串（英文/数字/符号）
- * @param x 横向起点
- * @param y 纵向页起点
- * @param s 字符串指针
- * @note 超出32~127的非法字符自动替换为空格
+ * @brief 鎸囧畾鍧愭爣鎵撳嵃ASCII瀛楃涓诧紙鑻辨枃/鏁板瓧/绗﹀彿锛?
+ * @param x 妯悜璧风偣
+ * @param y 绾靛悜椤佃捣鐐?
+ * @param s 瀛楃涓叉寚閽?
+ * @note 瓒呭嚭32~127鐨勯潪娉曞瓧绗﹁嚜鍔ㄦ浛鎹负绌烘牸
  */
 void OLED_WriteString(uint8_t x, uint8_t y, const char* s)
 {
@@ -355,17 +355,17 @@ void OLED_WriteString(uint8_t x, uint8_t y, const char* s)
     {
         uint8_t ch = *s;
 
-        // 小写字母转大写，匹配现有大写字库
+        // 灏忓啓瀛楁瘝杞ぇ鍐欙紝鍖归厤鐜版湁澶у啓瀛楀簱
         if(ch >= 'a' && ch <= 'z')
         {
             ch -= 32;
         }
 
-        // 超出可显示范围全部替换为空格
+        // 瓒呭嚭鍙樉绀鸿寖鍥村叏閮ㄦ浛鎹负绌烘牸
         if(ch < 32 || ch > 90)
             ch = 32;
 
-        // 偏移取6字节字库
+        // 鍋忕Щ鍙?瀛楄妭瀛楀簱
         const uint8_t *font = F6X8 + (ch - 32) * 6;
         OLED_WriteData(font, 6);
         s++;
@@ -373,7 +373,7 @@ void OLED_WriteString(uint8_t x, uint8_t y, const char* s)
 }
 
 /**
- * @brief 次方计算辅助函数，用于数字打印
+ * @brief 娆℃柟璁＄畻杈呭姪鍑芥暟锛岀敤浜庢暟瀛楁墦鍗?
  */
 static uint32_t OLED_Pow(uint32_t X, uint32_t Y)
 {
@@ -386,11 +386,11 @@ static uint32_t OLED_Pow(uint32_t X, uint32_t Y)
 }
 
 /**
- * @brief 指定坐标打印数字，可固定显示位数
- * @param x 横向起点
- * @param y 纵向页起点
- * @param num 要打印无符号数字
- * @param len 固定显示总长度，不足补空格
+ * @brief 鎸囧畾鍧愭爣鎵撳嵃鏁板瓧锛屽彲鍥哄畾鏄剧ず浣嶆暟
+ * @param x 妯悜璧风偣
+ * @param y 绾靛悜椤佃捣鐐?
+ * @param num 瑕佹墦鍗版棤绗﹀彿鏁板瓧
+ * @param len 鍥哄畾鏄剧ず鎬婚暱搴︼紝涓嶈冻琛ョ┖鏍?
  */
 void OLED_WriteNum(uint8_t x, uint8_t y, uint32_t num, uint8_t len)
 {
@@ -405,9 +405,9 @@ void OLED_WriteNum(uint8_t x, uint8_t y, uint32_t num, uint8_t len)
 			num /= 10;
 		}
 	}
-	// 长度不足末尾补空格
+	// 闀垮害涓嶈冻鏈熬琛ョ┖鏍?
 	while(i < len) buf[i++] = ' ';
-	// 反转字符顺序
+	// 鍙嶈浆瀛楃椤哄簭
 	uint8_t a = 0, b = i - 1;
 	while(a < b)
 	{
@@ -461,3 +461,5 @@ void OLED_WriteInt(uint8_t x, uint8_t y, int32_t num, uint8_t len)
 	buf[i] = '\0';
 	OLED_WriteString(x, y, buf);
 }
+
+
