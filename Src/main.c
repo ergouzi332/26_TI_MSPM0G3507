@@ -23,17 +23,17 @@ int main(void)
     Motor_Init();
 
     OLED_Clear();
-    OLED_WriteString(0, 0, "PID TEST");
-    OLED_WriteString(0, 1, "R:");
-    OLED_WriteString(0, 2, "P:");
-    OLED_WriteString(0, 3, "W:");
+    OLED_WriteString(0, 0, "DUAL PID");
+    OLED_WriteString(0, 1, "L:");   /* ???? */
+    OLED_WriteString(0, 2, "R:");   /* ???? */
+    OLED_WriteString(0, 3, "WL:");  /* ??PWM */
+    OLED_WriteString(0, 4, "WR:");  /* ??PWM */
 
-    uint32_t last = 0;
+    uint32_t lastL = 0, lastR = 0;
     uint32_t cnt = 0;
-    float smooth_rpm = 0.0f;
-    float integrator = 0.0f;
+    float smoothL = 0.0f, smoothR = 0.0f;
+    float intL = 0.0f, intR = 0.0f;
     float target = 200.0f;
-    float soft_target = 0.0f;
     float dt = 0.048f;
 
     while (1)
@@ -43,43 +43,46 @@ int main(void)
         {
             cnt = 0;
 
-            /* ???????+40 */
-            if (soft_target < target)
-            {
-                soft_target += 40.0f;
-                if (soft_target > target) soft_target = target;
+            /* ---- ?? ---- */
+            uint32_t nowL = Motor_GetLeftPulses();
+            uint32_t pulseL = nowL - lastL;
+            lastL = nowL;
+            float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
+            smoothL += (rawL - smoothL) * 0.3f;
+
+            float errL = target - smoothL;
+            float outL = 1.2f * errL + 1.0f * intL;
+            if (outL > 500.0f) outL = 500.0f;
+            if (outL < 60.0f)  outL = 60.0f;
+            if (outL < 500.0f) {
+                intL += errL * dt;
+                if (intL > 400.0f) intL = 400.0f;
+                if (intL < 0.0f)   intL = 0.0f;
             }
 
-            /* ?? */
-            uint32_t now = Motor_GetPulses();
-            uint32_t pulse = now - last;
-            last = now;
+            /* ---- ?? ---- */
+            uint32_t nowR = Motor_GetRightPulses();
+            uint32_t pulseR = nowR - lastR;
+            lastR = nowR;
+            float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
+            smoothR += (rawR - smoothR) * 0.3f;
 
-            float raw_rpm = (float)pulse * 60.0f / (float)PULSE_PER_REV / dt;
-            smooth_rpm += (raw_rpm - smooth_rpm) * 0.3f;
-
-            /* PID */
-            float err = soft_target - smooth_rpm;
-            float Kp = 1.2f;
-            float Ki = 1.0f;
-            float output = Kp * err + Ki * integrator;
-
-            if (output > 500.0f) output = 500.0f;
-            if (output < 60.0f)  output = 60.0f;
-
-            if (output < 500.0f)
-            {
-                integrator += err * dt;
-                if (integrator > 400.0f) integrator = 400.0f;
-                if (integrator < 0.0f)   integrator = 0.0f;
+            float errR = target - smoothR;
+            float outR = 1.2f * errR + 1.0f * intR;
+            if (outR > 500.0f) outR = 500.0f;
+            if (outR < 60.0f)  outR = 60.0f;
+            if (outR < 500.0f) {
+                intR += errR * dt;
+                if (intR > 400.0f) intR = 400.0f;
+                if (intR < 0.0f)   intR = 0.0f;
             }
 
-            uint16_t pwm = (uint16_t)output;
-            PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = pwm;
+            Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
-            oled_show_val(24, 1, (uint16_t)(smooth_rpm + 0.5f));
-            oled_show_val(24, 2, (uint16_t)pulse);
-            oled_show_val(24, 3, pwm);
+            oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
+            oled_show_val(24, 2, (uint16_t)(smoothR + 0.5f));
+            oled_show_val(24, 3, (uint16_t)outL);
+            oled_show_val(24, 4, (uint16_t)outR);
         }
     }
 }

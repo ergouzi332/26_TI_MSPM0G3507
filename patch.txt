@@ -1,0 +1,7 @@
+﻿    /* 编码器捕获 TIMG7 */
+    CAPTURE_B_INST->COUNTERREGS.LOAD = 0xFFFF;
+    DL_TimerG_startCounter(CAPTURE_B_INST);
+    /* RIS=35(0x23): 捕获事件在 bit5(0x20)，只开这个中断 */
+    CAPTURE_B_INST->CPU_INT.ICLR = 0xFFFFFFFF;
+    CAPTURE_B_INST->CPU_INT.IMASK = 0x20;
+    NVIC_EnableIRQ(CAPTURE_B_INST_INT_IRQN);

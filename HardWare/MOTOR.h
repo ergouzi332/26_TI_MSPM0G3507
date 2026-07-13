@@ -5,6 +5,8 @@
 
 void Motor_Init(void);
 void Motor_Stop(void);
-uint32_t Motor_GetPulses(void);
+void Motor_SetPWM(uint16_t left, uint16_t right);
+uint32_t Motor_GetLeftPulses(void);
+uint32_t Motor_GetRightPulses(void);
 
 #endif
