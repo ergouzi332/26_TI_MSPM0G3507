@@ -1,5 +1,6 @@
 ﻿#include "OLED.h"
 #include "MOTOR.h"
+#include "MPU6050.h"
 #include "ti_msp_dl_config.h"
 
 #define PULSE_PER_REV  600
@@ -20,14 +21,19 @@ int main(void)
 {
     SYSCFG_DL_init();
     OLED_Init();
+    MPU6050_Init();
     Motor_Init();
+    MPU6050_CalibrateGyro();
+    MPU6050_ResetYaw();
 
     OLED_Clear();
-    OLED_WriteString(0, 0, "DUAL PID");
+    OLED_WriteString(0, 0, "DUAL+YAWA");
     OLED_WriteString(0, 1, "L:");
-    OLED_WriteString(0, 2, "R:");
-    OLED_WriteString(0, 3, "WL:");
-    OLED_WriteString(0, 4, "WR:");
+    OLED_WriteString(40, 1, "R:");
+    OLED_WriteString(0, 2, "WL:");
+    OLED_WriteString(40, 2, "WR:");
+    OLED_WriteString(0, 4, "Y:");
+    OLED_WriteString(0, 5, "G:");
 
     uint32_t lastL = 0, lastR = 0;
     uint32_t cnt = 0;
@@ -35,9 +41,10 @@ int main(void)
     float intL = 0.0f, intR = 0.0f;
     float target = 200.0f;
     float dt = 0.048f;
-
-    /* soft start: target ramps up from 0 */
     float soft_target = 0.0f;
+
+    float yaw = 0.0f;
+    float yaw_int = 0.0f;
 
     while (1)
     {
@@ -46,11 +53,26 @@ int main(void)
         {
             cnt = 0;
 
-            /* soft target ramp — prevent lurch */
+            /* ---- yaw ---- */
+            int16_t gz = MPU6050_ReadGZ();
+            MPU6050_UpdateYawFromRaw(gz, dt);
+            yaw = MPU6050_GetYaw();
+
+            float yaw_out = 0.15f * (0.0f - yaw) + 0.05f * yaw_int;
+            if (yaw_out >  50.0f) yaw_out =  50.0f;
+            if (yaw_out < -50.0f) yaw_out = -50.0f;
+            yaw_int += (0.0f - yaw) * dt;
+            if (yaw_int >  20.0f) yaw_int =  20.0f;
+            if (yaw_int < -20.0f) yaw_int = -20.0f;
+
+            /* soft target */
             if (soft_target < target) {
                 soft_target += 30.0f;
                 if (soft_target > target) soft_target = target;
             }
+
+            float tL = soft_target - yaw_out;
+            float tR = soft_target + yaw_out;
 
             /* ---- left ---- */
             uint32_t nowL = Motor_GetLeftPulses();
@@ -59,17 +81,12 @@ int main(void)
             float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
             smoothL += (rawL - smoothL) * 0.3f;
 
-            float errL = soft_target - smoothL;
+            float errL = tL - smoothL;
             float outL = 1.2f * errL + 1.0f * intL;
             if (outL > 500.0f) outL = 500.0f;
             if (outL < 60.0f)  outL = 60.0f;
-
-            /* anti-windup: decay integral when saturated, cap at 150 */
-            if (outL >= 500.0f) {
-                intL *= 0.95f;             /* decay slowly */
-            } else {
-                intL += errL * dt;
-            }
+            if (outL >= 500.0f) { intL *= 0.95f; }
+            else { intL += errL * dt; }
             if (intL > 150.0f) intL = 150.0f;
             if (intL < 0.0f)   intL = 0.0f;
 
@@ -80,25 +97,23 @@ int main(void)
             float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
             smoothR += (rawR - smoothR) * 0.3f;
 
-            float errR = soft_target - smoothR;
+            float errR = tR - smoothR;
             float outR = 1.2f * errR + 1.0f * intR;
             if (outR > 500.0f) outR = 500.0f;
             if (outR < 60.0f)  outR = 60.0f;
-
-            if (outR >= 500.0f) {
-                intR *= 0.95f;
-            } else {
-                intR += errR * dt;
-            }
+            if (outR >= 500.0f) { intR *= 0.95f; }
+            else { intR += errR * dt; }
             if (intR > 150.0f) intR = 150.0f;
             if (intR < 0.0f)   intR = 0.0f;
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
             oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
-            oled_show_val(24, 2, (uint16_t)(smoothR + 0.5f));
-            oled_show_val(24, 3, (uint16_t)outL);
-            oled_show_val(24, 4, (uint16_t)outR);
+            oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
+            oled_show_val(24, 2, (uint16_t)outL);
+            oled_show_val(56, 2, (uint16_t)outR);
+            OLED_WriteInt(24, 4, (int16_t)(yaw * 10.0f), 5);
+            OLED_WriteInt(24, 5, gz, 6);
         }
     }
 }
