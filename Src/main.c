@@ -44,7 +44,6 @@ int main(void)
     float soft_target = 0.0f;
 
     float yaw = 0.0f;
-    float yaw_int = 0.0f;
 
     while (1)
     {
@@ -58,21 +57,14 @@ int main(void)
             MPU6050_UpdateYawFromRaw(gz, dt);
             yaw = MPU6050_GetYaw();
 
-            float yaw_out = 0.15f * (0.0f - yaw) + 0.05f * yaw_int;
-            if (yaw_out >  50.0f) yaw_out =  50.0f;
-            if (yaw_out < -50.0f) yaw_out = -50.0f;
-            yaw_int += (0.0f - yaw) * dt;
-            if (yaw_int >  20.0f) yaw_int =  20.0f;
-            if (yaw_int < -20.0f) yaw_int = -20.0f;
-
             /* soft target */
             if (soft_target < target) {
                 soft_target += 30.0f;
                 if (soft_target > target) soft_target = target;
             }
 
-            float tL = soft_target - yaw_out;
-            float tR = soft_target + yaw_out;
+            float tL = soft_target;
+            float tR = soft_target;
 
             /* ---- left ---- */
             uint32_t nowL = Motor_GetLeftPulses();

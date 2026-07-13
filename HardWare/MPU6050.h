@@ -39,6 +39,7 @@ int16_t MPU6050_GetLastGz(void);
 int MPU6050_GetCalDone(void);
 uint8_t MPU6050_DebugWho(void);
 uint8_t MPU6050_DebugWhoAt(uint8_t addr);
+uint32_t MPU6050_GetResetCnt(void);
 
 #endif
 

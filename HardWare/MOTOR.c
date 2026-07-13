@@ -40,8 +40,7 @@ void Motor_Init(void)
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_1A_PIN);
 
     DL_GPIO_setUpperPinsPolarity(GPIOA,
-        DL_GPIO_PIN_26_EDGE_RISE_FALL);
-    DL_GPIO_setUpperPinsPolarity(GPIOA,
+        DL_GPIO_PIN_26_EDGE_RISE_FALL |
         DL_GPIO_PIN_21_EDGE_RISE_FALL);
 
     NVIC_ClearPendingIRQ(GPIOA_INT_IRQn);
