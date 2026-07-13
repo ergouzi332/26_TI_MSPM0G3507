@@ -5,9 +5,6 @@
 
 void Motor_Init(void);
 void Motor_Stop(void);
-void Motor_SetTargetRPM(int16_t rpm);
-int16_t Motor_GetTargetRPM(void);
-int16_t Motor_GetActualRPM(void);
-void Motor_SpeedUpdate(void);
+uint32_t Motor_GetPulses(void);
 
 #endif

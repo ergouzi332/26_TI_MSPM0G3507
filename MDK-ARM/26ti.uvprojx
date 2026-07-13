@@ -394,11 +394,6 @@
               <FilePath>..\Src\ti_msp_dl_config.c</FilePath>
             </File>
             <File>
-              <FileName>ti_msp_dl_config.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Src\ti_msp_dl_config.h</FilePath>
-            </File>
-            <File>
               <FileName>startup_mspm0g350x_uvision.s</FileName>
               <FileType>2</FileType>
               <FilePath>startup_mspm0g350x_uvision.s</FilePath>
@@ -408,6 +403,11 @@
         <Group>
           <GroupName>HardWare</GroupName>
           <Files>
+            <File>
+              <FileName>ti_msp_dl_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Src\ti_msp_dl_config.h</FilePath>
+            </File>
             <File>
               <FileName>MPU6050.c</FileName>
               <FileType>1</FileType>

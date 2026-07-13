@@ -97,32 +97,6 @@ extern "C" {
 
 
 
-/* Defines for CAPTURE_A */
-#define CAPTURE_A_INST                                                   (TIMG6)
-#define CAPTURE_A_INST_IRQHandler                               TIMG6_IRQHandler
-#define CAPTURE_A_INST_INT_IRQN                                 (TIMG6_INT_IRQn)
-#define CAPTURE_A_INST_LOAD_VALUE                                           (0U)
-/* GPIO defines for channel 0 */
-#define GPIO_CAPTURE_A_C0_PORT                                             GPIOA
-#define GPIO_CAPTURE_A_C0_PIN                                     DL_GPIO_PIN_21
-#define GPIO_CAPTURE_A_C0_IOMUX                                  (IOMUX_PINCM46)
-#define GPIO_CAPTURE_A_C0_IOMUX_FUNC                 IOMUX_PINCM46_PF_TIMG6_CCP0
-
-/* Defines for CAPTURE_B */
-#define CAPTURE_B_INST                                                   (TIMG7)
-#define CAPTURE_B_INST_IRQHandler                               TIMG7_IRQHandler
-#define CAPTURE_B_INST_INT_IRQN                                 (TIMG7_INT_IRQn)
-#define CAPTURE_B_INST_LOAD_VALUE                                           (0U)
-/* GPIO defines for channel 0 */
-#define GPIO_CAPTURE_B_C0_PORT                                             GPIOA
-#define GPIO_CAPTURE_B_C0_PIN                                     DL_GPIO_PIN_26
-#define GPIO_CAPTURE_B_C0_IOMUX                                  (IOMUX_PINCM59)
-#define GPIO_CAPTURE_B_C0_IOMUX_FUNC                 IOMUX_PINCM59_PF_TIMG7_CCP0
-
-
-
-
-
 
 /* Defines for MPU_I2C0 */
 #define MPU_I2C0_INST                                                       I2C0
@@ -208,6 +182,9 @@ extern "C" {
 /* Defines for KEY_3: GPIOA.23 with pinCMx 53 on package pin 43 */
 #define KEY_KEY_3_PIN                                           (DL_GPIO_PIN_23)
 #define KEY_KEY_3_IOMUX                                          (IOMUX_PINCM53)
+/* Defines for KEY_4: GPIOA.3 with pinCMx 8 on package pin 9 */
+#define KEY_KEY_4_PIN                                            (DL_GPIO_PIN_3)
+#define KEY_KEY_4_IOMUX                                           (IOMUX_PINCM8)
 /* Port definition for Pin Group OLED */
 #define OLED_PORT                                                        (GPIOA)
 
@@ -217,6 +194,28 @@ extern "C" {
 /* Defines for OLED_SDA: GPIOA.16 with pinCMx 38 on package pin 31 */
 #define OLED_OLED_SDA_PIN                                       (DL_GPIO_PIN_16)
 #define OLED_OLED_SDA_IOMUX                                      (IOMUX_PINCM38)
+/* Port definition for Pin Group GOIO_GET */
+#define GOIO_GET_PORT                                                    (GPIOA)
+
+/* Defines for GET_2A: GPIOA.26 with pinCMx 59 on package pin 46 */
+// pins affected by this interrupt request:["GET_2A","GET_1A","GET_2B","GET_1B"]
+#define GOIO_GET_INT_IRQN                                       (GPIOA_INT_IRQn)
+#define GOIO_GET_INT_IIDX                       (DL_INTERRUPT_GROUP1_IIDX_GPIOA)
+#define GOIO_GET_GET_2A_IIDX                                (DL_GPIO_IIDX_DIO26)
+#define GOIO_GET_GET_2A_PIN                                     (DL_GPIO_PIN_26)
+#define GOIO_GET_GET_2A_IOMUX                                    (IOMUX_PINCM59)
+/* Defines for GET_1A: GPIOA.21 with pinCMx 46 on package pin 39 */
+#define GOIO_GET_GET_1A_IIDX                                (DL_GPIO_IIDX_DIO21)
+#define GOIO_GET_GET_1A_PIN                                     (DL_GPIO_PIN_21)
+#define GOIO_GET_GET_1A_IOMUX                                    (IOMUX_PINCM46)
+/* Defines for GET_2B: GPIOA.27 with pinCMx 60 on package pin 47 */
+#define GOIO_GET_GET_2B_IIDX                                (DL_GPIO_IIDX_DIO27)
+#define GOIO_GET_GET_2B_PIN                                     (DL_GPIO_PIN_27)
+#define GOIO_GET_GET_2B_IOMUX                                    (IOMUX_PINCM60)
+/* Defines for GET_1B: GPIOA.22 with pinCMx 47 on package pin 40 */
+#define GOIO_GET_GET_1B_IIDX                                (DL_GPIO_IIDX_DIO22)
+#define GOIO_GET_GET_1B_PIN                                     (DL_GPIO_PIN_22)
+#define GOIO_GET_GET_1B_IOMUX                                    (IOMUX_PINCM47)
 
 
 /* clang-format on */
@@ -226,8 +225,6 @@ void SYSCFG_DL_initPower(void);
 void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 void SYSCFG_DL_PWM_0_init(void);
-void SYSCFG_DL_CAPTURE_A_init(void);
-void SYSCFG_DL_CAPTURE_B_init(void);
 void SYSCFG_DL_MPU_I2C0_init(void);
 void SYSCFG_DL_UART_3_init(void);
 
