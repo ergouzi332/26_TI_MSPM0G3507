@@ -1,4 +1,4 @@
-#include "OLED.h"
+﻿#include "OLED.h"
 #include "MOTOR.h"
 #include "ti_msp_dl_config.h"
 
@@ -24,10 +24,10 @@ int main(void)
 
     OLED_Clear();
     OLED_WriteString(0, 0, "DUAL PID");
-    OLED_WriteString(0, 1, "L:");   /* ???? */
-    OLED_WriteString(0, 2, "R:");   /* ???? */
-    OLED_WriteString(0, 3, "WL:");  /* ??PWM */
-    OLED_WriteString(0, 4, "WR:");  /* ??PWM */
+    OLED_WriteString(0, 1, "L:");
+    OLED_WriteString(0, 2, "R:");
+    OLED_WriteString(0, 3, "WL:");
+    OLED_WriteString(0, 4, "WR:");
 
     uint32_t lastL = 0, lastR = 0;
     uint32_t cnt = 0;
@@ -36,6 +36,9 @@ int main(void)
     float target = 200.0f;
     float dt = 0.048f;
 
+    /* soft start: target ramps up from 0 */
+    float soft_target = 0.0f;
+
     while (1)
     {
         cnt++;
@@ -43,39 +46,52 @@ int main(void)
         {
             cnt = 0;
 
-            /* ---- ?? ---- */
+            /* soft target ramp — prevent lurch */
+            if (soft_target < target) {
+                soft_target += 30.0f;
+                if (soft_target > target) soft_target = target;
+            }
+
+            /* ---- left ---- */
             uint32_t nowL = Motor_GetLeftPulses();
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
             float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
             smoothL += (rawL - smoothL) * 0.3f;
 
-            float errL = target - smoothL;
+            float errL = soft_target - smoothL;
             float outL = 1.2f * errL + 1.0f * intL;
             if (outL > 500.0f) outL = 500.0f;
             if (outL < 60.0f)  outL = 60.0f;
-            if (outL < 500.0f) {
-                intL += errL * dt;
-                if (intL > 400.0f) intL = 400.0f;
-                if (intL < 0.0f)   intL = 0.0f;
-            }
 
-            /* ---- ?? ---- */
+            /* anti-windup: decay integral when saturated, cap at 150 */
+            if (outL >= 500.0f) {
+                intL *= 0.95f;             /* decay slowly */
+            } else {
+                intL += errL * dt;
+            }
+            if (intL > 150.0f) intL = 150.0f;
+            if (intL < 0.0f)   intL = 0.0f;
+
+            /* ---- right ---- */
             uint32_t nowR = Motor_GetRightPulses();
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
             float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
             smoothR += (rawR - smoothR) * 0.3f;
 
-            float errR = target - smoothR;
+            float errR = soft_target - smoothR;
             float outR = 1.2f * errR + 1.0f * intR;
             if (outR > 500.0f) outR = 500.0f;
             if (outR < 60.0f)  outR = 60.0f;
-            if (outR < 500.0f) {
+
+            if (outR >= 500.0f) {
+                intR *= 0.95f;
+            } else {
                 intR += errR * dt;
-                if (intR > 400.0f) intR = 400.0f;
-                if (intR < 0.0f)   intR = 0.0f;
             }
+            if (intR > 150.0f) intR = 150.0f;
+            if (intR < 0.0f)   intR = 0.0f;
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
