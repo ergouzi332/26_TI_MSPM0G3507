@@ -22,24 +22,22 @@ void GROUP1_IRQHandler(void)
 
 void Motor_Init(void)
 {
-    /* PWM: Down Counting + INV + 低电平触发
-       向下计数时:  ON% = (CC + 1) / 1001
-       CC=0   → ON≈0%  → 停止
-       CC=60  → ON≈6%  → 慢
-       CC=500 → ON≈50% → 中速
-       CC=1000→ ON≈100%→ 满转
-       CC 值直接写入，不需要反转
+    /*
+       PWM: Down Counting + INV + 低电平触发
+            CC=0 → ON≈0% → 停止(配合刹车)
+            CC=60 → ON≈6% → 慢
+            CC=500 → ON≈50% → 中速
     */
     PWM_0_INST->COMMONREGS.CCPD = 0x03;
     PWM_0_INST->COUNTERREGS.OCTL_01[0] |= (1 << 5);
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 0;   /* 停止 */
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 0;   /* 停止 */
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 0;
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 0;
     DL_TimerG_startCounter(PWM_0_INST);
 
-    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN);
-    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_2_PIN);
-    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_AIN_1_PIN);
-    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_AIN_2_PIN);
+    /* 初始刹车: IN1=IN2=HIGH → 刹车 */
+    DL_GPIO_setPins(MOTOR_DIR_PORT,
+        MOTOR_DIR_BIN_1_PIN | MOTOR_DIR_BIN_2_PIN |
+        MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
 
     DL_GPIO_disableInterrupt(GPIOA,
         GOIO_GET_GET_2B_PIN | GOIO_GET_GET_1B_PIN);
@@ -60,13 +58,28 @@ void Motor_Init(void)
     enc_right = 0;
 }
 
+void Motor_SetForward(void)
+{
+    /* B通道(左轮): BIN1=0, BIN2=1
+       A通道(右轮): AIN1=0, AIN2=1 */
+    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN | MOTOR_DIR_AIN_1_PIN);
+    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_2_PIN | MOTOR_DIR_AIN_2_PIN);
+}
+
+void Motor_SetBrake(void)
+{
+    /* 刹车: IN1=IN2=HIGH */
+    DL_GPIO_setPins(MOTOR_DIR_PORT,
+        MOTOR_DIR_BIN_1_PIN | MOTOR_DIR_BIN_2_PIN |
+        MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
+}
+
 uint32_t Motor_GetLeftPulses(void)  { return enc_left; }
 uint32_t Motor_GetRightPulses(void) { return enc_right; }
 
 void Motor_SetPWM(uint16_t left, uint16_t right)
 {
-    /* Down Counting + INV: CC 值直接对应 ON%
-       CC = 0 → ON≈0%(停), CC=1000 → ON=100%(满转) */
+    /* Down+INV: CC值=ON% */
     if (left  > 1000) left  = 1000;
     if (right > 1000) right = 1000;
     PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = left;
@@ -75,5 +88,6 @@ void Motor_SetPWM(uint16_t left, uint16_t right)
 
 void Motor_Stop(void)
 {
+    Motor_SetBrake();
     Motor_SetPWM(0, 0);
 }

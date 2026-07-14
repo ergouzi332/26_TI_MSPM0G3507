@@ -30,16 +30,16 @@ int main(void)
     MPU6050_CalibrateGyro();
     MPU6050_ResetYaw();
 
+    /* 初始刹车（Motor_Init已经设为刹车） */
     Motor_SetPWM(0, 0);
 
     OLED_Clear();
-    OLED_WriteString(0, 0, "READY");;
+    OLED_WriteString(0, 0, "READY");
     OLED_WriteString(0, 1, "L:");
     OLED_WriteString(40, 1, "R:");
     OLED_WriteString(0, 2, "WL:");
     OLED_WriteString(40, 2, "WR:");
-    OLED_WriteString(0, 3, "PL:");
-    OLED_WriteString(40, 3, "PR:");
+    OLED_WriteString(0, 3, "GR:");
     OLED_WriteString(0, 4, "Y:");
     OLED_WriteString(0, 5, "G:");
     OLED_WriteString(0, 7, "KEY:");
@@ -52,6 +52,7 @@ int main(void)
     float dt = 0.048f;
     float soft_target = 0.0f;
     float yaw = 0.0f;
+    uint8_t motor_running = 0;
 
     while (1)
     {
@@ -63,17 +64,23 @@ int main(void)
 
             uint8_t key_evt = KEY_Scan();
             if (key_evt & KEY_1) {
+                if (!motor_running) {
+                    Motor_SetForward();     /* !! 关键: 前进模式 !! */
+                    motor_running = 1;
+                }
                 target = 200.0f;
                 soft_target = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
             }
             if (key_evt & KEY_2) {
+                Motor_SetBrake();           /* !! 关键: 刹车 !! */
+                Motor_SetPWM(0, 0);
                 target = 0.0f;
                 soft_target = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
-                Motor_SetPWM(0, 0);
+                motor_running = 0;
             }
 
             int16_t gz = MPU6050_ReadGZ();
@@ -131,8 +138,8 @@ int main(void)
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
             oled_show_val(24, 2, (uint16_t)outL);
             oled_show_val(56, 2, (uint16_t)outR);
-            oled_show_val(24, 3, (uint16_t)pulseL);
-            oled_show_val(56, 3, (uint16_t)pulseR);
+            uint16_t gray = Grayscale_ReadAll();
+            OLED_WriteNum(24, 3, gray, 4);
             OLED_WriteInt(24, 4, (int16_t)(yaw * 10.0f), 5);
             OLED_WriteInt(24, 5, gz, 6);
             OLED_WriteInt(24, 7, (int32_t)key_evt, 2);
