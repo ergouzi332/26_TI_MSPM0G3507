@@ -1,4 +1,4 @@
-﻿#include "MPU6050.h"
+#include "MPU6050.h"
 #include <ti/devices/msp/msp.h>
 #include <ti/driverlib/driverlib.h>
 #include <ti/driverlib/dl_i2c.h>
@@ -32,7 +32,15 @@ int debug_cal_cnt = 0;
 static void i2c_wait(void)
 {
     volatile uint32_t w = 5000; while (--w);
-    while (DL_I2C_getControllerStatus(MPU_I2C0_INST) & DL_I2C_CONTROLLER_STATUS_BUSY);
+    uint32_t tout = 200000;
+    while ((DL_I2C_getControllerStatus(MPU_I2C0_INST) & DL_I2C_CONTROLLER_STATUS_BUSY) && --tout);
+
+    if (tout == 0) {
+        /* I2C bus hang - reset and re-init */
+        DL_I2C_reset(MPU_I2C0_INST);
+        SYSCFG_DL_MPU_I2C0_init();
+        MPU_I2C0_INST->MASTER.MFIFOCTL = 0x00;
+    }
 }
 
 void MPU6050_WriteReg(uint8_t reg, uint8_t dat)
