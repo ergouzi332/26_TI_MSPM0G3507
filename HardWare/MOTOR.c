@@ -22,11 +22,15 @@ void GROUP1_IRQHandler(void)
 
 void Motor_Init(void)
 {
-    /* 强制CC0输出使能 + INV，确保右轮(CC0)和左轮(CC1)行为一致 */
+    /* PWM: 低电平触发 + INV_OUT_ENABLED
+       CC=0  → 输出一直HIGH → OFF  → 停止
+       CC=60 → 输出6% LOW    → ON 6%  → 低速
+       CC=500 → 输出50% LOW  → ON 50% → 中速
+    */
     PWM_0_INST->COMMONREGS.CCPD = 0x03;
     PWM_0_INST->COUNTERREGS.OCTL_01[0] |= (1 << 5);
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 1000;
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 1000;
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 0;   /* 停止 */
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 0;   /* 停止 */
     DL_TimerG_startCounter(PWM_0_INST);
 
     DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN);
@@ -64,5 +68,5 @@ void Motor_SetPWM(uint16_t left, uint16_t right)
 
 void Motor_Stop(void)
 {
-    Motor_SetPWM(1000, 1000);
+    Motor_SetPWM(0, 0);
 }

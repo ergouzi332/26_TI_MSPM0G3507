@@ -30,8 +30,8 @@ int main(void)
     MPU6050_CalibrateGyro();
     MPU6050_ResetYaw();
 
-    /* default: motor stopped */
-    Motor_SetPWM(1000, 1000);
+    /* 默认停止: 低电平触发 + INV, CC=0=停止 */
+    Motor_SetPWM(0, 0);
 
     OLED_Clear();
     OLED_WriteString(0, 0, "READY");
@@ -61,7 +61,7 @@ int main(void)
         {
             cnt = 0;
 
-            /* ---- key scan (inside slow block, no fast-loop overhead) ---- */
+            /* key scan */
             uint8_t key_evt = KEY_Scan();
             if (key_evt & KEY_1) {
                 target = 200.0f;
@@ -74,15 +74,15 @@ int main(void)
                 soft_target = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
-                Motor_SetPWM(1000, 1000);
+                Motor_SetPWM(0, 0);
             }
 
-            /* ---- yaw: display only, not in control loop ---- */
+            /* yaw: display only */
             int16_t gz = MPU6050_ReadGZ();
             MPU6050_UpdateYawFromRaw(gz, dt);
             yaw = MPU6050_GetYaw();
 
-            /* ---- soft target ---- */
+            /* soft target */
             if (target > 0.0f) {
                 if (soft_target < target) {
                     soft_target += 30.0f;
@@ -92,7 +92,7 @@ int main(void)
                 soft_target = 0.0f;
             }
 
-            /* ---- left wheel ---- */
+            /* left wheel */
             uint32_t nowL = Motor_GetLeftPulses();
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
@@ -104,13 +104,13 @@ int main(void)
             float outL = 1.2f * errL + 1.0f * intL;
             if (outL > 500.0f) outL = 500.0f;
             if (outL < 60.0f && target > 0.0f) outL = 60.0f;
-            if (target == 0.0f) outL = 1000.0f;
+            if (target == 0.0f) outL = 0.0f;
             if (outL >= 500.0f) { intL *= 0.95f; }
             else { intL += errL * dt; }
             if (intL > 150.0f) intL = 150.0f;
             if (intL < 0.0f)   intL = 0.0f;
 
-            /* ---- right wheel ---- */
+            /* right wheel */
             uint32_t nowR = Motor_GetRightPulses();
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
@@ -122,7 +122,7 @@ int main(void)
             float outR = 1.2f * errR + 1.0f * intR;
             if (outR > 500.0f) outR = 500.0f;
             if (outR < 60.0f && target > 0.0f) outR = 60.0f;
-            if (target == 0.0f) outR = 1000.0f;
+            if (target == 0.0f) outR = 0.0f;
             if (outR >= 500.0f) { intR *= 0.95f; }
             else { intR += errR * dt; }
             if (intR > 150.0f) intR = 150.0f;
@@ -130,7 +130,7 @@ int main(void)
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
-            /* ---- OLED display ---- */
+            /* OLED */
             oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
             oled_show_val(24, 2, (uint16_t)outL);
