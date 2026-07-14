@@ -22,17 +22,18 @@ void GROUP1_IRQHandler(void)
 
 void Motor_Init(void)
 {
-    /* PWM: Down Counting + INV_OUT_ENABLED + 低电平触发
-       Motor_SetPWM(duty, duty) → 内部 CC = 1000 - duty
-       duty=0   → CC=1000 → 停止
-       duty=60  → CC=940  → ON 6%
-       duty=500 → CC=500  → ON 50%
-       duty=1000→ CC=0    → ON 100%
+    /* PWM: Down Counting + INV + 低电平触发
+       向下计数时:  ON% = (CC + 1) / 1001
+       CC=0   → ON≈0%  → 停止
+       CC=60  → ON≈6%  → 慢
+       CC=500 → ON≈50% → 中速
+       CC=1000→ ON≈100%→ 满转
+       CC 值直接写入，不需要反转
     */
     PWM_0_INST->COMMONREGS.CCPD = 0x03;
     PWM_0_INST->COUNTERREGS.OCTL_01[0] |= (1 << 5);
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 1000;  /* 初始停止 */
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 1000;  /* 初始停止 */
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 0;   /* 停止 */
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 0;   /* 停止 */
     DL_TimerG_startCounter(PWM_0_INST);
 
     DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN);
@@ -64,12 +65,12 @@ uint32_t Motor_GetRightPulses(void) { return enc_right; }
 
 void Motor_SetPWM(uint16_t left, uint16_t right)
 {
-    /* Down Counting + INV: 实际占空比 = (1000 - CC) / 1000
-       调用方传 duty，内部反转成 CC 值 */
+    /* Down Counting + INV: CC 值直接对应 ON%
+       CC = 0 → ON≈0%(停), CC=1000 → ON=100%(满转) */
     if (left  > 1000) left  = 1000;
     if (right > 1000) right = 1000;
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 1000 - left;
-    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 1000 - right;
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = left;
+    PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = right;
 }
 
 void Motor_Stop(void)
