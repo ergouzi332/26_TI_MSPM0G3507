@@ -72,8 +72,8 @@ int main(void)
     uint8_t key_evt = 0;
 
     /* ========== 调度时间戳 ========== */
-    uint32_t last_5ms = 0, last_20ms = 0;
-    uint32_t last_50ms = 0, last_500ms = 0;
+    uint32_t last_5ms = 0, last_50ms_pid = 0;
+    uint32_t last_500ms = 0;
 
     while (1)
     {
@@ -83,11 +83,11 @@ int main(void)
             /* TODO: Gray_Read() + Track_Control() */
         }
 
-        /* ========== 20ms: 电机PID + MPU ========== */
-        if (tick_ms - last_20ms >= 20) {
-            last_20ms = tick_ms;
+        /* ========== 50ms: 电机PID + MPU + KEY ========== */
+        if (tick_ms - last_50ms_pid >= 50) {
+            last_50ms_pid = tick_ms;
 
-            float dt = 0.02f;
+            float dt = 0.05f;
 
             /* ---- MPU 更新 ---- */
             gz = MPU6050_ReadGZ();
@@ -116,14 +116,13 @@ int main(void)
             smoothL += (rawL - smoothL) * 0.3f;
 
             float errL = targetL - smoothL;
-            outL = 1.2f * errL + 1.0f * intL;
-            if (outL > 500.0f) outL = 500.0f;
-            if (outL < 60.0f && base_target > 0.0f) outL = 60.0f;
+            intL += errL * dt;
+            if (intL > 100.0f) intL = 100.0f;
+            if (intL < -100.0f) intL = -100.0f;
+            outL = 0.5f * errL + 2.0f * intL;
+            if (outL > 300.0f) outL = 300.0f;
+            if (outL < 0.0f) outL = 0.0f;
             if (base_target == 0.0f) outL = 0.0f;
-            if (outL >= 500.0f) { intL *= 0.95f; }
-            else                { intL += errL * dt; }
-            if (intL > 150.0f) intL = 150.0f;
-            if (intL < 0.0f)   intL = 0.0f;
 
             /* === 右轮 PID === */
             uint32_t nowR = Motor_GetRightPulses();
@@ -133,29 +132,24 @@ int main(void)
             smoothR += (rawR - smoothR) * 0.3f;
 
             float errR = targetR - smoothR;
-            outR = 1.2f * errR + 1.0f * intR;
-            if (outR > 500.0f) outR = 500.0f;
-            if (outR < 60.0f && base_target > 0.0f) outR = 60.0f;
+            intR += errR * dt;
+            if (intR > 100.0f) intR = 100.0f;
+            if (intR < -100.0f) intR = -100.0f;
+            outR = 0.5f * errR + 2.0f * intR;
+            if (outR > 300.0f) outR = 300.0f;
+            if (outR < 0.0f) outR = 0.0f;
             if (base_target == 0.0f) outR = 0.0f;
-            if (outR >= 500.0f) { intR *= 0.95f; }
-            else                { intR += errR * dt; }
-            if (intR > 150.0f) intR = 150.0f;
-            if (intR < 0.0f)   intR = 0.0f;
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
-        }
 
-        /* ========== 50ms: 按键扫描 ========== */
-        if (tick_ms - last_50ms >= 50) {
-            last_50ms = tick_ms;
-
+            /* ---- KEY scan (same 50ms cycle) ---- */
             key_evt = KEY_Scan();
             if (key_evt & KEY_1) {
                 if (!motor_running) {
                     Motor_SetForward();
                     motor_running = 1;
                 }
-                base_target = 200.0f;
+                base_target = 120.0f;
                 soft_speed = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
@@ -170,6 +164,8 @@ int main(void)
                 motor_running = 0;
             }
         }
+
+
 
         /* ========== 500ms: OLED 刷新 ========== */
         if (tick_ms - last_500ms >= 500) {
