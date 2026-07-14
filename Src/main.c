@@ -13,7 +13,7 @@ void SysTick_Handler(void)
     tick_ms++;
 }
 
-#define PULSE_PER_REV  600
+#define PULSE_PER_REV  300
 
 static void oled_show_val(uint8_t x, uint8_t y, uint16_t val)
 {
@@ -72,7 +72,7 @@ int main(void)
     uint8_t key_evt = 0;
 
     /* ========== 调度时间戳 ========== */
-    uint32_t last_5ms = 0, last_50ms_pid = 0;
+    uint32_t last_5ms = 0, last_100ms_pid = 0;
     uint32_t last_500ms = 0;
 
     while (1)
@@ -84,10 +84,10 @@ int main(void)
         }
 
         /* ========== 50ms: 电机PID + MPU + KEY ========== */
-        if (tick_ms - last_50ms_pid >= 50) {
-            last_50ms_pid = tick_ms;
+        if (tick_ms - last_100ms_pid >= 100) {
+            last_100ms_pid = tick_ms;
 
-            float dt = 0.05f;
+            float dt = 0.10f;
 
             /* ---- MPU 更新 ---- */
             gz = MPU6050_ReadGZ();
@@ -113,14 +113,14 @@ int main(void)
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
             float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
-            smoothL += (rawL - smoothL) * 0.3f;
+            smoothL += (rawL - smoothL) * 0.1f;
 
             float errL = targetL - smoothL;
             intL += errL * dt;
             if (intL > 100.0f) intL = 100.0f;
             if (intL < -100.0f) intL = -100.0f;
-            outL = 0.5f * errL + 2.0f * intL;
-            if (outL > 300.0f) outL = 300.0f;
+            outL = 80.0f + 0.2f * errL;
+            if (outL > 200.0f) outL = 200.0f;
             if (outL < 0.0f) outL = 0.0f;
             if (base_target == 0.0f) outL = 0.0f;
 
@@ -129,14 +129,14 @@ int main(void)
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
             float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
-            smoothR += (rawR - smoothR) * 0.3f;
+            smoothR += (rawR - smoothR) * 0.1f;
 
             float errR = targetR - smoothR;
             intR += errR * dt;
             if (intR > 100.0f) intR = 100.0f;
             if (intR < -100.0f) intR = -100.0f;
-            outR = 0.5f * errR + 2.0f * intR;
-            if (outR > 300.0f) outR = 300.0f;
+            outR = 80.0f + 0.2f * errR;
+            if (outR > 200.0f) outR = 200.0f;
             if (outR < 0.0f) outR = 0.0f;
             if (base_target == 0.0f) outR = 0.0f;
 
