@@ -32,10 +32,13 @@ static uint8_t read_keys(void)
 uint8_t KEY_Scan(void)
 {
     uint8_t now = read_keys();
-    { volatile uint32_t w = 5000; while (--w); }
+    /* short debounce: ~200 cycles @ 32MHz = 6.25us */
+    { volatile uint32_t w = 200; while (--w); }
     uint8_t stable = read_keys();
     if (now != stable) return 0;
-    uint8_t pressed = now & ~key_last;
+
+    /* fix: ~now & key_last = bits that went 1->0 (pressed, active-low) */
+    uint8_t pressed = (~now) & key_last;
     key_last = now;
     return pressed;
 }

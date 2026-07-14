@@ -1,4 +1,4 @@
-#include "OLED.h"
+﻿#include "OLED.h"
 #include "MOTOR.h"
 #include "MPU6050.h"
 #include "KEY.h"
@@ -57,32 +57,32 @@ int main(void)
     {
         cnt++;
 
-        /* key scan */
-        uint8_t key_evt = KEY_Scan();
-        if (key_evt & KEY_1) {
-            target = 200.0f;
-            soft_target = 0.0f;
-            intL = 0.0f;
-            intR = 0.0f;
-        }
-        if (key_evt & KEY_2) {
-            target = 0.0f;
-            soft_target = 0.0f;
-            intL = 0.0f;
-            intR = 0.0f;
-            Motor_SetPWM(1000, 1000);
-        }
-
         if (cnt >= 500000)
         {
             cnt = 0;
 
-            /* yaw: display only, not in control loop */
+            /* ---- key scan (inside slow block, no fast-loop overhead) ---- */
+            uint8_t key_evt = KEY_Scan();
+            if (key_evt & KEY_1) {
+                target = 200.0f;
+                soft_target = 0.0f;
+                intL = 0.0f;
+                intR = 0.0f;
+            }
+            if (key_evt & KEY_2) {
+                target = 0.0f;
+                soft_target = 0.0f;
+                intL = 0.0f;
+                intR = 0.0f;
+                Motor_SetPWM(1000, 1000);
+            }
+
+            /* ---- yaw: display only, not in control loop ---- */
             int16_t gz = MPU6050_ReadGZ();
             MPU6050_UpdateYawFromRaw(gz, dt);
             yaw = MPU6050_GetYaw();
 
-            /* soft target */
+            /* ---- soft target ---- */
             if (target > 0.0f) {
                 if (soft_target < target) {
                     soft_target += 30.0f;
@@ -92,7 +92,7 @@ int main(void)
                 soft_target = 0.0f;
             }
 
-            /* left wheel */
+            /* ---- left wheel ---- */
             uint32_t nowL = Motor_GetLeftPulses();
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
@@ -110,7 +110,7 @@ int main(void)
             if (intL > 150.0f) intL = 150.0f;
             if (intL < 0.0f)   intL = 0.0f;
 
-            /* right wheel */
+            /* ---- right wheel ---- */
             uint32_t nowR = Motor_GetRightPulses();
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
@@ -130,7 +130,7 @@ int main(void)
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
-            /* OLED display */
+            /* ---- OLED display ---- */
             oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
             oled_show_val(24, 2, (uint16_t)outL);
