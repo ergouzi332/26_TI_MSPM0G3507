@@ -30,18 +30,18 @@ int main(void)
     MPU6050_CalibrateGyro();
     MPU6050_ResetYaw();
 
-    /* 默认停止: 低电平触发 + INV, CC=0=停止 */
     Motor_SetPWM(0, 0);
 
     OLED_Clear();
-    OLED_WriteString(0, 0, "READY");
+    OLED_WriteString(0, 0, "READY");;
     OLED_WriteString(0, 1, "L:");
     OLED_WriteString(40, 1, "R:");
     OLED_WriteString(0, 2, "WL:");
     OLED_WriteString(40, 2, "WR:");
+    OLED_WriteString(0, 3, "PL:");
+    OLED_WriteString(40, 3, "PR:");
     OLED_WriteString(0, 4, "Y:");
     OLED_WriteString(0, 5, "G:");
-    OLED_WriteString(0, 6, "GR:");
     OLED_WriteString(0, 7, "KEY:");
 
     uint32_t lastL = 0, lastR = 0;
@@ -61,7 +61,6 @@ int main(void)
         {
             cnt = 0;
 
-            /* key scan */
             uint8_t key_evt = KEY_Scan();
             if (key_evt & KEY_1) {
                 target = 200.0f;
@@ -77,12 +76,10 @@ int main(void)
                 Motor_SetPWM(0, 0);
             }
 
-            /* yaw: display only */
             int16_t gz = MPU6050_ReadGZ();
             MPU6050_UpdateYawFromRaw(gz, dt);
             yaw = MPU6050_GetYaw();
 
-            /* soft target */
             if (target > 0.0f) {
                 if (soft_target < target) {
                     soft_target += 30.0f;
@@ -92,7 +89,7 @@ int main(void)
                 soft_target = 0.0f;
             }
 
-            /* left wheel */
+            /* left */
             uint32_t nowL = Motor_GetLeftPulses();
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
@@ -110,7 +107,7 @@ int main(void)
             if (intL > 150.0f) intL = 150.0f;
             if (intL < 0.0f)   intL = 0.0f;
 
-            /* right wheel */
+            /* right */
             uint32_t nowR = Motor_GetRightPulses();
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
@@ -130,15 +127,14 @@ int main(void)
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
 
-            /* OLED */
             oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
             oled_show_val(24, 2, (uint16_t)outL);
             oled_show_val(56, 2, (uint16_t)outR);
+            oled_show_val(24, 3, (uint16_t)pulseL);
+            oled_show_val(56, 3, (uint16_t)pulseR);
             OLED_WriteInt(24, 4, (int16_t)(yaw * 10.0f), 5);
             OLED_WriteInt(24, 5, gz, 6);
-            uint16_t gray = Grayscale_ReadAll();
-            OLED_WriteNum(24, 6, gray, 4);
             OLED_WriteInt(24, 7, (int32_t)key_evt, 2);
         }
     }
