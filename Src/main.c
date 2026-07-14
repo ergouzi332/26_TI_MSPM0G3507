@@ -1,9 +1,17 @@
-﻿#include "OLED.h"
+#include "OLED.h"
 #include "MOTOR.h"
 #include "MPU6050.h"
 #include "KEY.h"
 #include "GRAYSCALE.h"
 #include "ti_msp_dl_config.h"
+
+/* SysTick 1ms 中断计数器 */
+volatile uint32_t tick_ms = 0;
+
+void SysTick_Handler(void)
+{
+    tick_ms++;
+}
 
 #define PULSE_PER_REV  600
 
@@ -30,8 +38,13 @@ int main(void)
     MPU6050_CalibrateGyro();
     MPU6050_ResetYaw();
 
-    /* 初始刹车（Motor_Init已经设为刹车） */
+    /* 初始刹车 */
     Motor_SetPWM(0, 0);
+
+    /* SysTick: 1ms tick @ 32MHz, 开中断 */
+    SysTick->LOAD = 32000UL - 1;
+    SysTick->VAL  = 0;
+    SysTick->CTRL = 0x07;   /* CLKSOURCE=1, TICKINT=1, ENABLE=1 */
 
     OLED_Clear();
     OLED_WriteString(0, 0, "READY");
@@ -44,95 +57,123 @@ int main(void)
     OLED_WriteString(0, 5, "G:");
     OLED_WriteString(0, 7, "KEY:");
 
+    /* ========== PID 状态变量 ========== */
     uint32_t lastL = 0, lastR = 0;
-    uint32_t cnt = 0;
     float smoothL = 0.0f, smoothR = 0.0f;
     float intL = 0.0f, intR = 0.0f;
-    float target = 0.0f;
-    float dt = 0.048f;
-    float soft_target = 0.0f;
+    float outL = 0.0f, outR = 0.0f;
+
+    /* ========== 控制变量 ========== */
+    float base_target = 0.0f;
+    float soft_speed = 0.0f;
     float yaw = 0.0f;
+    int16_t gz = 0;
     uint8_t motor_running = 0;
+    uint8_t key_evt = 0;
+
+    /* ========== 调度时间戳 ========== */
+    uint32_t last_5ms = 0, last_20ms = 0;
+    uint32_t last_50ms = 0, last_500ms = 0;
 
     while (1)
     {
-        cnt++;
+        /* ========== 5ms: 灰度读取 + 循迹 ========== */
+        if (tick_ms - last_5ms >= 5) {
+            last_5ms = tick_ms;
+            /* TODO: Gray_Read() + Track_Control() */
+        }
 
-        if (cnt >= 500000)
-        {
-            cnt = 0;
+        /* ========== 20ms: 电机PID + MPU ========== */
+        if (tick_ms - last_20ms >= 20) {
+            last_20ms = tick_ms;
 
-            uint8_t key_evt = KEY_Scan();
-            if (key_evt & KEY_1) {
-                if (!motor_running) {
-                    Motor_SetForward();     /* !! 关键: 前进模式 !! */
-                    motor_running = 1;
-                }
-                target = 200.0f;
-                soft_target = 0.0f;
-                intL = 0.0f;
-                intR = 0.0f;
-            }
-            if (key_evt & KEY_2) {
-                Motor_SetBrake();           /* !! 关键: 刹车 !! */
-                Motor_SetPWM(0, 0);
-                target = 0.0f;
-                soft_target = 0.0f;
-                intL = 0.0f;
-                intR = 0.0f;
-                motor_running = 0;
-            }
+            float dt = 0.02f;
 
-            int16_t gz = MPU6050_ReadGZ();
+            /* ---- MPU 更新 ---- */
+            gz = MPU6050_ReadGZ();
             MPU6050_UpdateYawFromRaw(gz, dt);
             yaw = MPU6050_GetYaw();
 
-            if (target > 0.0f) {
-                if (soft_target < target) {
-                    soft_target += 30.0f;
-                    if (soft_target > target) soft_target = target;
+            /* ---- 基础速度斜坡 ---- */
+            if (base_target > 0.0f) {
+                if (soft_speed < base_target) {
+                    soft_speed += 30.0f;
+                    if (soft_speed > base_target)
+                        soft_speed = base_target;
                 }
             } else {
-                soft_target = 0.0f;
+                soft_speed = 0.0f;
             }
 
-            /* left */
+            float targetL = soft_speed;
+            float targetR = soft_speed;
+
+            /* === 左轮 PID === */
             uint32_t nowL = Motor_GetLeftPulses();
             uint32_t pulseL = nowL - lastL;
             lastL = nowL;
             float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
             smoothL += (rawL - smoothL) * 0.3f;
 
-            float tL = soft_target;
-            float errL = tL - smoothL;
-            float outL = 1.2f * errL + 1.0f * intL;
+            float errL = targetL - smoothL;
+            outL = 1.2f * errL + 1.0f * intL;
             if (outL > 500.0f) outL = 500.0f;
-            if (outL < 60.0f && target > 0.0f) outL = 60.0f;
-            if (target == 0.0f) outL = 0.0f;
+            if (outL < 60.0f && base_target > 0.0f) outL = 60.0f;
+            if (base_target == 0.0f) outL = 0.0f;
             if (outL >= 500.0f) { intL *= 0.95f; }
-            else { intL += errL * dt; }
+            else                { intL += errL * dt; }
             if (intL > 150.0f) intL = 150.0f;
             if (intL < 0.0f)   intL = 0.0f;
 
-            /* right */
+            /* === 右轮 PID === */
             uint32_t nowR = Motor_GetRightPulses();
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
             float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
             smoothR += (rawR - smoothR) * 0.3f;
 
-            float tR = soft_target;
-            float errR = tR - smoothR;
-            float outR = 1.2f * errR + 1.0f * intR;
+            float errR = targetR - smoothR;
+            outR = 1.2f * errR + 1.0f * intR;
             if (outR > 500.0f) outR = 500.0f;
-            if (outR < 60.0f && target > 0.0f) outR = 60.0f;
-            if (target == 0.0f) outR = 0.0f;
+            if (outR < 60.0f && base_target > 0.0f) outR = 60.0f;
+            if (base_target == 0.0f) outR = 0.0f;
             if (outR >= 500.0f) { intR *= 0.95f; }
-            else { intR += errR * dt; }
+            else                { intR += errR * dt; }
             if (intR > 150.0f) intR = 150.0f;
             if (intR < 0.0f)   intR = 0.0f;
 
             Motor_SetPWM((uint16_t)outL, (uint16_t)outR);
+        }
+
+        /* ========== 50ms: 按键扫描 ========== */
+        if (tick_ms - last_50ms >= 50) {
+            last_50ms = tick_ms;
+
+            key_evt = KEY_Scan();
+            if (key_evt & KEY_1) {
+                if (!motor_running) {
+                    Motor_SetForward();
+                    motor_running = 1;
+                }
+                base_target = 200.0f;
+                soft_speed = 0.0f;
+                intL = 0.0f;
+                intR = 0.0f;
+            }
+            if (key_evt & KEY_2) {
+                Motor_SetBrake();
+                Motor_SetPWM(0, 0);
+                base_target = 0.0f;
+                soft_speed = 0.0f;
+                intL = 0.0f;
+                intR = 0.0f;
+                motor_running = 0;
+            }
+        }
+
+        /* ========== 500ms: OLED 刷新 ========== */
+        if (tick_ms - last_500ms >= 500) {
+            last_500ms = tick_ms;
 
             oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
