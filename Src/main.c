@@ -1,6 +1,7 @@
 ﻿#include "OLED.h"
 #include "MOTOR.h"
 #include "MPU6050.h"
+#include "GRAYSCALE.h"
 #include "ti_msp_dl_config.h"
 
 #define PULSE_PER_REV  600
@@ -29,6 +30,7 @@ int main(void)
     Motor_Init();
     MPU6050_CalibrateGyro();
     MPU6050_ResetYaw();
+    Grayscale_Init();
 
     OLED_Clear();
     OLED_WriteString(0, 0, "DUAL+YAWA");
@@ -38,6 +40,7 @@ int main(void)
     OLED_WriteString(40, 2, "WR:");
     OLED_WriteString(0, 4, "Y:");
     OLED_WriteString(0, 5, "G:");
+    OLED_WriteString(0, 6, "GS:");
 
     uint32_t lastL = 0, lastR = 0;
     uint32_t cnt = 0;
@@ -137,6 +140,14 @@ int main(void)
             oled_show_val(56, 2, (uint16_t)outR);
             OLED_WriteInt(24, 4, (int16_t)(yaw * 10.0f), 5);
             OLED_WriteInt(24, 5, gz, 6);
+            {
+                uint16_t gs = Grayscale_ReadAll();
+                char buf[9];
+                for (int i = 0; i < 8; i++)
+                    buf[i] = (gs & (1 << (7 - i))) ? '1' : '0';
+                buf[8] = 0;
+                OLED_WriteString(24, 6, buf);
+            }
         }
     }
 }

@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 void Grayscale_Init(void);
-int16_t Grayscale_Read(void);
-int16_t Grayscale_GetOffset(void);
+uint8_t Grayscale_ReadChannel(uint8_t ch);
+uint16_t Grayscale_ReadAll(void);
 
 #endif
