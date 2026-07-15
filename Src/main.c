@@ -119,7 +119,7 @@ int main(void)
             intL += errL * dt;
             if (intL > 100.0f) intL = 100.0f;
             if (intL < -100.0f) intL = -100.0f;
-            outL = 80.0f + 0.2f * errL;
+            outL = 80.0f + 0.2f * errL + 0.3f * intL;
             if (outL > 200.0f) outL = 200.0f;
             if (outL < 0.0f) outL = 0.0f;
             if (base_target == 0.0f) outL = 0.0f;
@@ -135,7 +135,7 @@ int main(void)
             intR += errR * dt;
             if (intR > 100.0f) intR = 100.0f;
             if (intR < -100.0f) intR = -100.0f;
-            outR = 80.0f + 0.2f * errR;
+            outR = 80.0f + 0.2f * errR + 0.3f * intR;
             if (outR > 200.0f) outR = 200.0f;
             if (outR < 0.0f) outR = 0.0f;
             if (base_target == 0.0f) outR = 0.0f;
@@ -149,7 +149,7 @@ int main(void)
                     Motor_SetForward();
                     motor_running = 1;
                 }
-                base_target = 120.0f;
+                base_target = 100.0f;
                 soft_speed = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
