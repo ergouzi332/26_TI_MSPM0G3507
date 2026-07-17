@@ -5,7 +5,7 @@
 #include "GRAYSCALE.h"
 #include "ti_msp_dl_config.h"
 
-/* SysTick 1ms ä¸­æ–­è®¡æ•°å™¨ */
+/* SysTick 1ms ä¸­æ–­è®¡æ•°å™?*/
 volatile uint32_t tick_ms = 0;
 
 void SysTick_Handler(void)
@@ -19,6 +19,19 @@ static void oled_show_val(uint8_t x, uint8_t y, uint16_t val)
 {
     char buf[6];
     buf[0] = (val / 10000) % 10 + '0';
+    buf[1] = (val / 1000) % 10 + '0';
+    buf[2] = (val / 100) % 10 + '0';
+    buf[3] = (val / 10) % 10 + '0';
+    buf[4] = val % 10 + '0';
+    buf[5] = 0;
+    OLED_WriteString(x, y, buf);
+}
+
+static void oled_show_signed(uint8_t x, uint8_t y, int16_t val)
+{
+    char buf[7];
+    if (val < 0) { buf[0] = '-'; val = -val; }
+    else { buf[0] = '+'; }
     buf[1] = (val / 1000) % 10 + '0';
     buf[2] = (val / 100) % 10 + '0';
     buf[3] = (val / 10) % 10 + '0';
@@ -55,9 +68,8 @@ int main(void)
     OLED_WriteString(0, 3, "GR:");
     OLED_WriteString(0, 4, "Y:");
     OLED_WriteString(0, 5, "G:");
-    OLED_WriteString(0, 7, "KEY:");
 
-    /* ========== PID çŠ¶æ€å˜é‡ ========== */
+    /* ========== PID çŠ¶æ€å˜é‡?========== */
     uint32_t lastL = 0, lastR = 0;
     float smoothL = 0.0f, smoothR = 0.0f;
     float intL = 0.0f, intR = 0.0f;
@@ -65,22 +77,33 @@ int main(void)
 
     /* ========== æŽ§åˆ¶å˜é‡ ========== */
     float base_target = 0.0f;
+    int8_t track_error = 0;
     float soft_speed = 0.0f;
     float yaw = 0.0f;
     int16_t gz = 0;
     uint8_t motor_running = 0;
     uint8_t key_evt = 0;
 
-    /* ========== è°ƒåº¦æ—¶é—´æˆ³ ========== */
+    /* ========== è°ƒåº¦æ—¶é—´æˆ?========== */
     uint32_t last_5ms = 0, last_100ms_pid = 0;
     uint32_t last_500ms = 0;
 
     while (1)
     {
-        /* ========== 5ms: ç°åº¦è¯»å– + å¾ªè¿¹ ========== */
+
+        /* ========== 5ms: »Ò¶È¶ÁÈ¡ + ¼ÆËãÎó²î ========== */
         if (tick_ms - last_5ms >= 5) {
             last_5ms = tick_ms;
-            /* TODO: Gray_Read() + Track_Control() */
+            uint16_t gray_raw = Grayscale_ReadAll();
+            uint16_t line = (~gray_raw) & 0xFF;  /* ·´×ª£º1=ºÚÏß */
+
+            /* ¼ÓÈ¨Æ½¾ù¼ÆËãÆ«ÒÆ */
+            int sum = 0, cnt = 0;
+            int8_t weight[8] = {-7, -5, -3, -1, 1, 3, 5, 7};
+            for (int bi = 0; bi < 8; bi++) {
+                if (line & (1 << bi)) { sum += weight[bi]; cnt++; }
+            }
+            track_error = (cnt > 0) ? (sum / cnt) : 0;
         }
 
         /* ========== 50ms: ç”µæœºPID + MPU + KEY ========== */
@@ -105,8 +128,8 @@ int main(void)
                 soft_speed = 0.0f;
             }
 
-            float targetL = soft_speed;
-            float targetR = soft_speed;
+            float targetL = soft_speed + track_error * 3;
+            float targetR = soft_speed - track_error * 3;
 
             /* === å·¦è½® PID === */
             uint32_t nowL = Motor_GetLeftPulses();
@@ -167,7 +190,7 @@ int main(void)
 
 
 
-        /* ========== 500ms: OLED åˆ·æ–° ========== */
+        /* ========== 500ms: OLED Ë¢ÐÂ ========== */
         if (tick_ms - last_500ms >= 500) {
             last_500ms = tick_ms;
 
@@ -175,11 +198,15 @@ int main(void)
             oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
             oled_show_val(24, 2, (uint16_t)outL);
             oled_show_val(56, 2, (uint16_t)outR);
+
             uint16_t gray = Grayscale_ReadAll();
-            OLED_WriteNum(24, 3, gray, 4);
-            OLED_WriteInt(24, 4, (int16_t)(yaw * 10.0f), 5);
-            OLED_WriteInt(24, 5, gz, 6);
-            OLED_WriteInt(24, 7, (int32_t)key_evt, 2);
+            char gb[10]; gb[8] = 0;
+            for (int bi = 0; bi < 8; bi++)
+                gb[bi] = (gray & (1 << bi)) ? '0' : '1';
+            OLED_WriteString(24, 3, gb);
+
+            oled_show_signed(24, 4, (int16_t)(yaw * 10.0f));
+            oled_show_signed(24, 5, gz);
         }
     }
 }
