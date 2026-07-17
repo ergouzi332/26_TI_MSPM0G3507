@@ -1,4 +1,4 @@
-Ôªø#include "GRAYSCALE.h"
+#include "GRAYSCALE.h"
 #include "ti_msp_dl_config.h"
 
 void Grayscale_Init(void) {}
@@ -9,7 +9,7 @@ static void select_channel(uint8_t ch)
     if (ch & 0x01) DL_GPIO_setPins(Grayscale_Sensor_PORT, Grayscale_Sensor_AD0_PIN);
     if (ch & 0x02) DL_GPIO_setPins(Grayscale_Sensor_PORT, Grayscale_Sensor_AD1_PIN);
     if (ch & 0x04) DL_GPIO_setPins(Grayscale_Sensor_PORT, Grayscale_Sensor_AD2_PIN);
-    { volatile uint32_t w = 200; while (--w); }
+    { volatile uint32_t w = 20000; while (--w); }  /* º”¥ÛMUX«–ªª—” ± */
 }
 
 uint8_t Grayscale_ReadChannel(uint8_t ch)

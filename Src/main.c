@@ -95,7 +95,7 @@ int main(void)
         if (tick_ms - last_5ms >= 5) {
             last_5ms = tick_ms;
             uint16_t gray_raw = Grayscale_ReadAll();
-            uint16_t line = (~gray_raw) & 0xFF;  /* 反转：1=黑线 */
+            uint16_t line = gray_raw & 0xFF;  /* 1=黑线(传感器高电平表示黑) */
 
             /* 加权平均计算偏移 */
             int sum = 0, cnt = 0;
