@@ -19,7 +19,8 @@ void SysTick_Handler(void)
 // 编码器参数：车轮单圈总脉冲数
 #define PULSE_PER_REV  300
 // 循迹差速转向增益系数
-#define STEER_GAIN    3
+#define PWM_LIMIT     500
+#define STEER_GAIN    10
 
 /**
  * @brief OLED无符号5位数字打印，完整填充5位字符，消除显存残留
@@ -107,7 +108,7 @@ int main(void)
     uint8_t key_evt = 0;          // 按键事件标志
 
     // ===================== 分时调度时间戳 =====================
-    uint32_t last_5ms = 0, last_50ms_pid = 0;
+    uint32_t last_5ms = 0, last_30ms_pid = 0;
     uint32_t last_500ms = 0;
 
     while (1)
@@ -128,8 +129,8 @@ int main(void)
         }
 
         // ===================== 30ms周期任务：MPU姿态、电机PID、按键扫描 =====================
-        if (tick_ms - last_50ms_pid >= 30) {
-            last_50ms_pid = tick_ms;
+        if (tick_ms - last_30ms_pid >= 30) {
+            last_30ms_pid = tick_ms;
             float dt = 0.03f; // 本次计算周期30ms
 
             // 读取陀螺仪，更新航向角积分
@@ -140,7 +141,7 @@ int main(void)
             // 缓加速逻辑，平滑起步
             if (base_target > 0.0f) {
                 if (soft_speed < base_target) {
-                    soft_speed += 30.0f;
+                    soft_speed += 5.0f;
                     if (soft_speed > base_target)
                         soft_speed = base_target;
                 }
@@ -148,9 +149,9 @@ int main(void)
                 soft_speed = 0.0f;
             }
 
-            // 根据循迹误差生成基础目标转速
-            float targetL = soft_speed + track_error * 3;
-            float targetR = soft_speed - track_error * 3;
+            // 左右轮速度目标一致（循迹由PID输出叠加差速负责）
+            float targetL = soft_speed;
+            float targetR = soft_speed;
 
             // ---------------------- 左轮速度闭环PID ----------------------
             uint32_t nowL = Motor_GetLeftPulses();
@@ -166,8 +167,8 @@ int main(void)
             if (intL > 100.0f) intL = 100.0f;
             if (intL < -100.0f) intL = -100.0f;
             outL = 80.0f + 0.2f * errL + 0.3f * intL;
-            // PWM输出限幅0~200
-            if (outL > 200.0f) outL = 200.0f;
+            // PWM输出限幅
+            if (outL > PWM_LIMIT) outL = (float)PWM_LIMIT;
             if (outL < 0.0f) outL = 0.0f;
             // 停止状态强制PWM为0
             if (base_target == 0.0f) outL = 0.0f;
@@ -184,7 +185,7 @@ int main(void)
             if (intR > 100.0f) intR = 100.0f;
             if (intR < -100.0f) intR = -100.0f;
             outR = 80.0f + 0.2f * errR + 0.3f * intR;
-            if (outR > 200.0f) outR = 200.0f;
+            if (outR > PWM_LIMIT) outR = (float)PWM_LIMIT;
             if (outR < 0.0f) outR = 0.0f;
             if (base_target == 0.0f) outR = 0.0f;
 
@@ -193,8 +194,8 @@ int main(void)
             outR -= track_error * STEER_GAIN;
 
             // 最终PWM限幅
-            if (outL > 200) outL = 200;  if (outL < 0) outL = 0;
-            if (outR > 200) outR = 200;  if (outR < 0) outR = 0;
+            if (outL > PWM_LIMIT) outL = (float)PWM_LIMIT;  if (outL < 0) outL = 0;
+            if (outR > PWM_LIMIT) outR = (float)PWM_LIMIT;  if (outR < 0) outR = 0;
 
             // 运行输出PWM，停止则清零
             if (base_target > 0.0f)
