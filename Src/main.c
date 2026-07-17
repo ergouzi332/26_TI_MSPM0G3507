@@ -3,6 +3,7 @@
 #include "MPU6050.h"
 #include "KEY.h"
 #include "GRAYSCALE.h"
+#include "uart3.h"
 #include "ti_msp_dl_config.h"
 
 // 系统1ms时基计数器，SysTick中断自增
@@ -20,7 +21,7 @@ void SysTick_Handler(void)
 #define PULSE_PER_REV  300
 // 循迹差速转向增益系数
 #define PWM_LIMIT     500
-#define STEER_GAIN    10
+#define STEER_GAIN    3
 
 /**
  * @brief OLED无符号5位数字打印，完整填充5位字符，消除显存残留
@@ -75,6 +76,9 @@ int main(void)
 
     // 上电电机PWM置0，小车静止
     Motor_SetPWM(0, 0);
+    // UART3测试 PB2=TX PB3=RX 9600 8N1
+    UART3_Init();
+    UART3_Test();
 
     // SysTick配置：32MHz系统时钟，1ms中断
     SysTick->LOAD = 32000UL - 1;
@@ -129,9 +133,9 @@ int main(void)
         }
 
         // ===================== 30ms周期任务：MPU姿态、电机PID、按键扫描 =====================
-        if (tick_ms - last_30ms_pid >= 30) {
+        if (tick_ms - last_30ms_pid >= 20) {
             last_30ms_pid = tick_ms;
-            float dt = 0.03f; // 本次计算周期30ms
+            float dt = 0.02f; // 本次计算周期30ms
 
             // 读取陀螺仪，更新航向角积分
             gz = MPU6050_ReadGZ();
@@ -159,14 +163,14 @@ int main(void)
             lastL = nowL;
             // 脉冲换算转速：转/分钟
             float rawL = (float)pulseL * 60.0f / PULSE_PER_REV / dt;
-            smoothL += (rawL - smoothL) * 0.1f; // 一阶低通滤波平滑转速
+            smoothL += (rawL - smoothL) * 0.3f; // 一阶低通滤波平滑转速
 
             float errL = targetL - smoothL;
             intL += errL * dt;
             // 积分限幅，防止积分饱和
-            if (intL > 100.0f) intL = 100.0f;
-            if (intL < -100.0f) intL = -100.0f;
-            outL = 80.0f + 0.2f * errL + 0.3f * intL;
+            if (intL > 300.0f) intL = 300.0f;
+            if (intL < -300.0f) intL = -300.0f;
+            outL = 90.0f + 0.35f * errL + 0.1f * intL;
             // PWM输出限幅
             if (outL > PWM_LIMIT) outL = (float)PWM_LIMIT;
             if (outL < 0.0f) outL = 0.0f;
@@ -178,20 +182,24 @@ int main(void)
             uint32_t pulseR = nowR - lastR;
             lastR = nowR;
             float rawR = (float)pulseR * 60.0f / PULSE_PER_REV / dt;
-            smoothR += (rawR - smoothR) * 0.1f;
+            smoothR += (rawR - smoothR) * 0.3f;
 
             float errR = targetR - smoothR;
             intR += errR * dt;
-            if (intR > 100.0f) intR = 100.0f;
-            if (intR < -100.0f) intR = -100.0f;
-            outR = 80.0f + 0.2f * errR + 0.3f * intR;
+            if (intR > 300.0f) intR = 300.0f;
+            if (intR < -300.0f) intR = -300.0f;
+            outR = 90.0f + 0.35f * errR + 0.1f * intR;
             if (outR > PWM_LIMIT) outR = (float)PWM_LIMIT;
             if (outR < 0.0f) outR = 0.0f;
             if (base_target == 0.0f) outR = 0.0f;
 
             // PID输出叠加循迹差速转向修正
-            outL += track_error * STEER_GAIN;
-            outR -= track_error * STEER_GAIN;
+            float steer = (float)track_error * STEER_GAIN;
+            steer *= (1.0f + soft_speed / 500.0f);
+            if (steer > 40.0f) steer = 40.0f;
+            if (steer < -40.0f) steer = -40.0f;
+            outL += steer;
+            outR -= steer;
 
             // 最终PWM限幅
             if (outL > PWM_LIMIT) outL = (float)PWM_LIMIT;  if (outL < 0) outL = 0;
@@ -211,7 +219,7 @@ int main(void)
                     Motor_SetForward();
                     motor_running = 1;
                 }
-                base_target = 100.0f;
+                base_target = 250.0f;
                 soft_speed = 0.0f;
                 intL = 0.0f;
                 intR = 0.0f;
@@ -252,3 +260,4 @@ int main(void)
         }
     }
 }
+
