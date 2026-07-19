@@ -55,3 +55,23 @@ void UART3_Test(void)
     }
     UART3_SendString("\r\nDone\r\n");
 }
+
+
+void UART3_PrintRPM(uint16_t pwm, uint16_t rpmL, uint16_t rpmR)
+{
+    UART3_SendString("PWM:");
+    UART3_SendByte(48 + pwm / 100);
+    UART3_SendByte(48 + (pwm / 10) % 10);
+    UART3_SendByte(48 + (pwm % 10));
+    UART3_SendByte(32);
+    UART3_SendString("L:");
+    UART3_SendByte(48 + rpmL / 100);
+    UART3_SendByte(48 + (rpmL / 10) % 10);
+    UART3_SendByte(48 + (rpmL % 10));
+    UART3_SendByte(32);
+    UART3_SendString("R:");
+    UART3_SendByte(48 + rpmR / 100);
+    UART3_SendByte(48 + (rpmR / 10) % 10);
+    UART3_SendByte(48 + (rpmR % 10));
+    UART3_SendString("\r\n");
+}

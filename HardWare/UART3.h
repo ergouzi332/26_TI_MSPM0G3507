@@ -12,4 +12,6 @@ uint8_t UART3_ReceiveByte(void);
 uint8_t UART3_DataAvailable(void);
 void UART3_Test(void);
 
+void UART3_PrintRPM(uint16_t pwm, uint16_t rpmL, uint16_t rpmR);
+
 #endif

@@ -97,6 +97,24 @@ extern "C" {
 
 
 
+/* Defines for TIMER_SCHEDULE */
+#define TIMER_SCHEDULE_INST                                              (TIMG6)
+#define TIMER_SCHEDULE_INST_IRQHandler                          TIMG6_IRQHandler
+#define TIMER_SCHEDULE_INST_INT_IRQN                            (TIMG6_INT_IRQn)
+#define TIMER_SCHEDULE_INST_LOAD_VALUE                                  (39999U)
+/* Defines for TIMER_0 */
+#define TIMER_0_INST                                                     (TIMA1)
+#define TIMER_0_INST_IRQHandler                                 TIMA1_IRQHandler
+#define TIMER_0_INST_INT_IRQN                                   (TIMA1_INT_IRQn)
+#define TIMER_0_INST_LOAD_VALUE                                             (0U)
+/* Defines for TIMER_1 */
+#define TIMER_1_INST                                                     (TIMA0)
+#define TIMER_1_INST_IRQHandler                                 TIMA0_IRQHandler
+#define TIMER_1_INST_INT_IRQN                                   (TIMA0_INT_IRQn)
+#define TIMER_1_INST_LOAD_VALUE                                             (0U)
+
+
+
 
 /* Defines for MPU_I2C0 */
 #define MPU_I2C0_INST                                                       I2C0
@@ -170,21 +188,22 @@ extern "C" {
 /* Defines for AD2: GPIOB.9 with pinCMx 26 on package pin 23 */
 #define Grayscale_Sensor_AD2_PIN                                 (DL_GPIO_PIN_9)
 #define Grayscale_Sensor_AD2_IOMUX                               (IOMUX_PINCM26)
-/* Port definition for Pin Group KEY */
-#define KEY_PORT                                                         (GPIOA)
-
 /* Defines for KEY_1: GPIOA.25 with pinCMx 55 on package pin 45 */
+#define KEY_KEY_1_PORT                                                   (GPIOA)
 #define KEY_KEY_1_PIN                                           (DL_GPIO_PIN_25)
 #define KEY_KEY_1_IOMUX                                          (IOMUX_PINCM55)
 /* Defines for KEY_2: GPIOA.24 with pinCMx 54 on package pin 44 */
+#define KEY_KEY_2_PORT                                                   (GPIOA)
 #define KEY_KEY_2_PIN                                           (DL_GPIO_PIN_24)
 #define KEY_KEY_2_IOMUX                                          (IOMUX_PINCM54)
 /* Defines for KEY_3: GPIOA.23 with pinCMx 53 on package pin 43 */
+#define KEY_KEY_3_PORT                                                   (GPIOA)
 #define KEY_KEY_3_PIN                                           (DL_GPIO_PIN_23)
 #define KEY_KEY_3_IOMUX                                          (IOMUX_PINCM53)
-/* Defines for KEY_4: GPIOA.3 with pinCMx 8 on package pin 9 */
-#define KEY_KEY_4_PIN                                            (DL_GPIO_PIN_3)
-#define KEY_KEY_4_IOMUX                                           (IOMUX_PINCM8)
+/* Defines for KEY_4: GPIOB.20 with pinCMx 48 on package pin 41 */
+#define KEY_KEY_4_PORT                                                   (GPIOB)
+#define KEY_KEY_4_PIN                                           (DL_GPIO_PIN_20)
+#define KEY_KEY_4_IOMUX                                          (IOMUX_PINCM48)
 /* Port definition for Pin Group OLED */
 #define OLED_PORT                                                        (GPIOA)
 
@@ -225,6 +244,9 @@ void SYSCFG_DL_initPower(void);
 void SYSCFG_DL_GPIO_init(void);
 void SYSCFG_DL_SYSCTL_init(void);
 void SYSCFG_DL_PWM_0_init(void);
+void SYSCFG_DL_TIMER_SCHEDULE_init(void);
+void SYSCFG_DL_TIMER_0_init(void);
+void SYSCFG_DL_TIMER_1_init(void);
 void SYSCFG_DL_MPU_I2C0_init(void);
 void SYSCFG_DL_UART_3_init(void);
 

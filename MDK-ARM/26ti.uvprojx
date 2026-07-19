@@ -488,6 +488,16 @@
               <FileType>5</FileType>
               <FilePath>..\HardWare\KEY.h</FilePath>
             </File>
+            <File>
+              <FileName>UART3.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\HardWare\UART3.c</FilePath>
+            </File>
+            <File>
+              <FileName>UART3.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\HardWare\UART3.h</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
