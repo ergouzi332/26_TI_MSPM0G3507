@@ -1,17 +1,18 @@
-#include "uart3.h"
+﻿#include "uart3.h"
 
 void UART3_Init(void)
 {
-    // UART3 ?? SYSCFG_DL_init() ???????
-    // ???????FIFO??
+    // 冲刷 RX FIFO
     while (!DL_UART_isRXFIFOEmpty(UART_3_INST)) {
         DL_UART_receiveData(UART_3_INST);
     }
+    // 确保 TX 空闲
+    while (DL_UART_isBusy(UART_3_INST));
 }
 
+// 阻塞发送一个字节（115200 下 ~87us/byte）
 void UART3_SendByte(uint8_t data)
 {
-    // ??TX FIFO?????????
     while (DL_UART_isTXFIFOFull(UART_3_INST));
     DL_UART_transmitData(UART_3_INST, data);
 }
@@ -41,37 +42,31 @@ uint8_t UART3_ReceiveByte(void)
     return DL_UART_receiveData(UART_3_INST);
 }
 
-// ============================================================
-// ???????????????????? 9600 8N1 ??
-// ============================================================
 void UART3_Test(void)
 {
     UART3_SendString("UART3 OK\r\n");
-    UART3_SendString("PB2=TX PB3=RX @9600\r\n");
-
-    // ??0~9??????
+    UART3_SendString("PB2=TX PB3=RX @115200\r\n");
     for (uint8_t i = 0; i < 10; i++) {
         UART3_SendByte('0' + i);
     }
     UART3_SendString("\r\nDone\r\n");
 }
 
-
-void UART3_PrintRPM(uint16_t pwm, uint16_t rpmL, uint16_t rpmR)
+void UART3_PrintRPM(uint16_t pwmL, uint16_t pwmR,
+                    uint16_t rpmL, uint16_t rpmR)
 {
-    UART3_SendString("PWM:");
-    UART3_SendByte(48 + pwm / 100);
-    UART3_SendByte(48 + (pwm / 10) % 10);
-    UART3_SendByte(48 + (pwm % 10));
-    UART3_SendByte(32);
-    UART3_SendString("L:");
-    UART3_SendByte(48 + rpmL / 100);
-    UART3_SendByte(48 + (rpmL / 10) % 10);
-    UART3_SendByte(48 + (rpmL % 10));
-    UART3_SendByte(32);
-    UART3_SendString("R:");
-    UART3_SendByte(48 + rpmR / 100);
-    UART3_SendByte(48 + (rpmR / 10) % 10);
-    UART3_SendByte(48 + (rpmR % 10));
-    UART3_SendString("\r\n");
+    // "PWM:xxx L:xxx R:xxx\r\n"  逐字节发送，不上 sprintf
+    UART3_SendByte('P'); UART3_SendByte('W'); UART3_SendByte('M'); UART3_SendByte(':');
+    UART3_SendByte('0' + (pwmL / 100) % 10);
+    UART3_SendByte('0' + (pwmL / 10) % 10);
+    UART3_SendByte('0' + (pwmL % 10));
+    UART3_SendByte(' '); UART3_SendByte('L'); UART3_SendByte(':');
+    UART3_SendByte('0' + (rpmL / 100) % 10);
+    UART3_SendByte('0' + (rpmL / 10) % 10);
+    UART3_SendByte('0' + (rpmL % 10));
+    UART3_SendByte(' '); UART3_SendByte('R'); UART3_SendByte(':');
+    UART3_SendByte('0' + (rpmR / 100) % 10);
+    UART3_SendByte('0' + (rpmR / 10) % 10);
+    UART3_SendByte('0' + (rpmR % 10));
+    UART3_SendByte('\r'); UART3_SendByte('\n');
 }

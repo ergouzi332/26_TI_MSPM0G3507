@@ -144,9 +144,9 @@ extern "C" {
 #define GPIO_UART_3_IOMUX_TX                                     (IOMUX_PINCM15)
 #define GPIO_UART_3_IOMUX_RX_FUNC                      IOMUX_PINCM16_PF_UART3_RX
 #define GPIO_UART_3_IOMUX_TX_FUNC                      IOMUX_PINCM15_PF_UART3_TX
-#define UART_3_BAUD_RATE                                                  (9600)
-#define UART_3_IBRD_32_MHZ_9600_BAUD                                       (208)
-#define UART_3_FBRD_32_MHZ_9600_BAUD                                        (21)
+#define UART_3_BAUD_RATE                                                (115200)
+#define UART_3_IBRD_32_MHZ_115200_BAUD                                      (17)
+#define UART_3_FBRD_32_MHZ_115200_BAUD                                      (23)
 
 
 

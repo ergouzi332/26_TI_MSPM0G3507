@@ -1,9 +1,8 @@
-#include "MOTOR.h"
+﻿#include "MOTOR.h"
 #include <ti/devices/msp/msp.h>
 #include <ti/driverlib/driverlib.h>
 #include "ti_msp_dl_config.h"
 
-// 2x: 13-line hall x 1:20 gearbox x 2 edges (A rise + B rise) = 520 PPR
 #define PULSE_PER_REV  520
 
 volatile uint32_t enc_left = 0;
@@ -15,11 +14,8 @@ void GROUP1_IRQHandler(void)
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
 
-    // Left: 2A rising + 2B rising
     if (flags & GOIO_GET_GET_2A_PIN) { enc_left++; }
     if (flags & GOIO_GET_GET_2B_PIN) { enc_left++; }
-
-    // Right: 1A rising + 1B rising
     if (flags & GOIO_GET_GET_1A_PIN) { enc_right++; }
     if (flags & GOIO_GET_GET_1B_PIN) { enc_right++; }
 
@@ -40,7 +36,6 @@ void Motor_Init(void)
         MOTOR_DIR_BIN_1_PIN | MOTOR_DIR_BIN_2_PIN |
         MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
 
-    // Enable all 4 pins, rising edge only (no polarity toggle)
     DL_GPIO_clearInterruptStatus(GPIOA,
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
@@ -58,8 +53,7 @@ void Motor_Init(void)
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     NVIC_SetPriority(GPIOA_INT_IRQn, 0);
 
-    enc_left = 0;
-    enc_right = 0;
+    enc_left = 0; enc_right = 0;
 }
 
 void Motor_SetForward(void)
@@ -75,8 +69,26 @@ void Motor_SetBrake(void)
         MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
 }
 
-uint32_t Motor_GetLeftPulses(void)  { return enc_left; }
-uint32_t Motor_GetRightPulses(void) { return enc_right; }
+// === 读后清零 ===
+uint32_t Motor_GetLeftPulses(void)
+{
+    uint32_t val;
+    __disable_irq();
+    val = enc_left;
+    enc_left = 0;
+    __enable_irq();
+    return val;
+}
+
+uint32_t Motor_GetRightPulses(void)
+{
+    uint32_t val;
+    __disable_irq();
+    val = enc_right;
+    enc_right = 0;
+    __enable_irq();
+    return val;
+}
 
 void Motor_SetPWM(uint16_t left, uint16_t right)
 {

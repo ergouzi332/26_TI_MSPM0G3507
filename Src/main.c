@@ -1,4 +1,4 @@
-#include "OLED.h"
+﻿#include "OLED.h"
 #include "MOTOR.h"
 #include "MPU6050.h"
 #include "KEY.h"
@@ -7,39 +7,14 @@
 #include "ti_msp_dl_config.h"
 
 volatile uint32_t tick_ms = 0;
-
 void SysTick_Handler(void) { tick_ms++; }
 
-#define PPR             520
-#define TARGET_RPM      150.0f
-#define PWM_FEEDFORWARD 100.0f
-#define KP              0.08f
-#define SPEED_ALPHA     0.4f
-
-static void oled_show_val(uint8_t x, uint8_t y, uint16_t val)
-{
-    char buf[6];
-    buf[0] = (val / 10000) % 10 + '0';
-    buf[1] = (val / 1000) % 10 + '0';
-    buf[2] = (val / 100) % 10 + '0';
-    buf[3] = (val / 10) % 10 + '0';
-    buf[4] = val % 10 + '0';
-    buf[5] = 0;
-    OLED_WriteString(x, y, buf);
-}
-
-static void oled_show_signed(uint8_t x, uint8_t y, int16_t val)
-{
-    char buf[7];
-    if (val < 0) { buf[0] = '-'; val = -val; }
-    else { buf[0] = '+'; }
-    buf[1] = (val / 1000) % 10 + '0';
-    buf[2] = (val / 100) % 10 + '0';
-    buf[3] = (val / 10) % 10 + '0';
-    buf[4] = val % 10 + '0';
-    buf[5] = 0;
-    OLED_WriteString(x, y, buf);
-}
+// === 脉冲 PID 参数 ===
+#define TARGET_PULSE    9           // PWM100 时 ~10 脉冲/20ms
+#define PWM_FF          100.0f
+#define KP              5.0f
+#define KI              0.2f
+#define INTEGRAL_LIMIT  500.0f
 
 int main(void)
 {
@@ -50,119 +25,141 @@ int main(void)
 
     SysTick->LOAD = 32000UL - 1; SysTick->VAL = 0; SysTick->CTRL = 0x07;
 
-    OLED_Clear();
-    OLED_WriteString(0, 0, "READY");
-    OLED_WriteString(0, 1, "L:"); OLED_WriteString(40, 1, "R:");
-    OLED_WriteString(0, 2, "WL:"); OLED_WriteString(40, 2, "WR:");
-    OLED_WriteString(0, 3, "GR:"); OLED_WriteString(0, 4, "Y:");
-    OLED_WriteString(0, 5, "G:");
+    OLED_Clear(); OLED_WriteString(0, 0, "INIT DONE");
 
-    uint32_t last_encL = 0, last_encR = 0;
-    float smoothL = 0.0f, smoothR = 0.0f;
+    float integralL = 0.0f, integralR = 0.0f;
+    int16_t pwmL = 0, pwmR = 0;
     uint8_t motor_run = 0;
-    uint16_t pwm_outL = 0, pwm_outR = 0;
-    int16_t track_error = 0, gz = 0;
-    float yaw = 0.0f;
 
-    uint32_t last_5ms = 0, last_10ms = 0, last_20ms = 0;
-    uint32_t last_100ms = 0, last_500ms = 0;
+    // 调试变量
+    uint16_t d_pwmL = 0, d_pwmR = 0;
+    int16_t d_pL = 0, d_pR = 0;
+    int16_t d_er = 0, d_yaw = 0, d_gz = 0;
+    uint16_t d_gray = 0;
+
+    uint32_t last_20ms = 0, last_500ms = 0;
 
     while (1)
     {
         uint32_t now = tick_ms;
 
-        // 5ms: grayscale
-        if (now - last_5ms >= 5) {
-            last_5ms = now;
-            uint16_t line = Grayscale_ReadAll() & 0xFF;
-            int sum = 0;
-            int8_t w[8] = {-7,-5,-3,-1,1,3,5,7};
-            for (int i = 0; i < 8; i++) { if (line & (1 << i)) sum += w[i]; }
-            track_error = sum;
-        }
+        // ========== 20ms ==========
+        if (now - last_20ms >= 20) {
+            last_20ms = now;
 
-        // 10ms: key scan
-        if (now - last_10ms >= 10) {
-            last_10ms = now;
+            // MPU
+            d_gz = MPU6050_ReadGZ();
+            MPU6050_UpdateYawFromRaw(d_gz, 0.02f);
+            d_yaw = (int16_t)(MPU6050_GetYaw() * 10.0f);
+
+            // 按键
             uint8_t key = KEY_Scan();
             if (key & KEY_1) {
                 if (!motor_run) {
-                    Motor_SetForward(); motor_run = 1;
-                    last_encL = Motor_GetLeftPulses();
-                    last_encR = Motor_GetRightPulses();
-                    smoothL = 0.0f; smoothR = 0.0f;
+                    Motor_SetForward();
+                    motor_run = 1;
+                    integralL = 0.0f; integralR = 0.0f;
+                    Motor_GetLeftPulses();  // 清零
+                    Motor_GetRightPulses();
                 }
             }
             if (key & KEY_2) {
                 Motor_SetBrake(); Motor_SetPWM(0, 0);
-                motor_run = 0; pwm_outL = 0; pwm_outR = 0;
-                smoothL = 0.0f; smoothR = 0.0f;
+                motor_run = 0; pwmL = 0; pwmR = 0;
+                integralL = 0.0f; integralR = 0.0f;
+                Motor_GetLeftPulses();
+                Motor_GetRightPulses();
             }
-        }
 
-        // 20ms: MPU
-        if (now - last_20ms >= 20) {
-            last_20ms = now;
-            gz = MPU6050_ReadGZ();
-            MPU6050_UpdateYawFromRaw(gz, 0.02f);
-            yaw = MPU6050_GetYaw();
-        }
-
-        // 100ms: speed closed-loop (P-only)
-        if (now - last_100ms >= 100) {
-            last_100ms = now;
-            float dt = 0.1f;
-
+            // 脉冲 PID（读后自动清零）
             if (motor_run) {
-                uint32_t nL = Motor_GetLeftPulses();
-                uint32_t pL = nL - last_encL;
-                last_encL = nL;
-                float rawL = (float)pL * 60.0f / (float)PPR / dt;
-                smoothL += (rawL - smoothL) * SPEED_ALPHA;
+                int32_t pL = (int32_t)Motor_GetLeftPulses();
+                d_pL = (int16_t)pL;
+                float errL = (float)(TARGET_PULSE - pL);
+                integralL += errL;
+                if (integralL > INTEGRAL_LIMIT) integralL = INTEGRAL_LIMIT;
+                if (integralL < -INTEGRAL_LIMIT) integralL = -INTEGRAL_LIMIT;
+                float outL = PWM_FF + KP * errL + KI * integralL;
+                if (outL < 0.0f) outL = 0.0f;
+                if (outL > 300.0f) outL = 300.0f;
+                pwmL = (int16_t)(outL + 0.5f);
 
-                uint32_t nR = Motor_GetRightPulses();
-                uint32_t pR = nR - last_encR;
-                last_encR = nR;
-                float rawR = (float)pR * 60.0f / (float)PPR / dt;
-                smoothR += (rawR - smoothR) * SPEED_ALPHA;
+                int32_t pR = (int32_t)Motor_GetRightPulses();
+                d_pR = (int16_t)pR;
+                float errR = (float)(TARGET_PULSE - pR);
+                integralR += errR;
+                if (integralR > INTEGRAL_LIMIT) integralR = INTEGRAL_LIMIT;
+                if (integralR < -INTEGRAL_LIMIT) integralR = -INTEGRAL_LIMIT;
+                float outR = PWM_FF + KP * errR + KI * integralR;
+                if (outR < 0.0f) outR = 0.0f;
+                if (outR > 300.0f) outR = 300.0f;
+                pwmR = (int16_t)(outR + 0.5f);
 
-                float errL = TARGET_RPM - smoothL;
-                float errR = TARGET_RPM - smoothR;
-                float pwmL = PWM_FEEDFORWARD + KP * errL;
-                float pwmR = PWM_FEEDFORWARD + KP * errR;
-
-                if (pwmL < 0.0f) pwmL = 0.0f;
-                if (pwmL > 300.0f) pwmL = 300.0f;
-                if (pwmR < 0.0f) pwmR = 0.0f;
-                if (pwmR > 300.0f) pwmR = 300.0f;
-
-                pwm_outL = (uint16_t)(pwmL + 0.5f);
-                pwm_outR = (uint16_t)(pwmR + 0.5f);
-
-                Motor_SetPWM(pwm_outL, pwm_outR);
+                Motor_SetPWM((uint16_t)pwmL, (uint16_t)pwmR);
+            } else {
+                d_pL = 0; d_pR = 0;
             }
 
-            UART3_PrintRPM(pwm_outL, (uint16_t)(smoothL + 0.5f),
-                                     (uint16_t)(smoothR + 0.5f));
+            d_pwmL = (uint16_t)pwmL;
+            d_pwmR = (uint16_t)pwmR;
+
+            // 灰度
+            uint16_t line = Grayscale_ReadAll() & 0xFF;
+            d_gray = line;
+            int sum = 0;
+            int8_t w[8] = {-7,-5,-3,-1,1,3,5,7};
+            for (int i = 0; i < 8; i++) { if (line & (1 << i)) sum += w[i]; }
+            d_er = (int16_t)sum;
         }
 
-        // 500ms: OLED
+        // ========== 500ms: 串口 ==========
         if (now - last_500ms >= 500) {
             last_500ms = now;
-            oled_show_val(24, 1, (uint16_t)(smoothL + 0.5f));
-            oled_show_val(56, 1, (uint16_t)(smoothR + 0.5f));
-            oled_show_val(24, 2, pwm_outL);
-            oled_show_val(56, 2, pwm_outR);
 
-            uint16_t g = Grayscale_ReadAll();
-            char gb[10]; gb[8] = 0;
-            for (int i = 0; i < 8; i++)
-                gb[i] = (g & (1 << i)) ? '0' : '1';
-            OLED_WriteString(24, 3, gb);
+            // "PWM:xxx L:+xx R:+xx ER:+xx GR:xxxxxxxx Y:+xxxx GZ:+xxxxx\r\n"
+            UART3_SendByte('P'); UART3_SendByte('W'); UART3_SendByte('M'); UART3_SendByte(':');
+            UART3_SendByte('0' + (d_pwmL / 100) % 10);
+            UART3_SendByte('0' + (d_pwmL / 10) % 10);
+            UART3_SendByte('0' + (d_pwmL % 10));
+            UART3_SendByte(' '); UART3_SendByte('L'); UART3_SendByte(':');
+            int16_t v = d_pL;
+            if (v < 0) { UART3_SendByte('-'); v = -v; } else { UART3_SendByte('+'); }
+            UART3_SendByte('0' + (v / 10) % 10);
+            UART3_SendByte('0' + (v % 10));
+            UART3_SendByte(' '); UART3_SendByte('R'); UART3_SendByte(':');
+            v = d_pR;
+            if (v < 0) { UART3_SendByte('-'); v = -v; } else { UART3_SendByte('+'); }
+            UART3_SendByte('0' + (v / 10) % 10);
+            UART3_SendByte('0' + (v % 10));
 
-            oled_show_signed(24, 4, (int16_t)(yaw * 10.0f));
-            oled_show_signed(24, 5, gz);
+            UART3_SendByte(' '); UART3_SendByte('E'); UART3_SendByte('R'); UART3_SendByte(':');
+            v = d_er;
+            if (v < 0) { UART3_SendByte('-'); v = -v; } else { UART3_SendByte('+'); }
+            UART3_SendByte('0' + (v / 10) % 10);
+            UART3_SendByte('0' + (v % 10));
+
+            UART3_SendByte(' '); UART3_SendByte('G'); UART3_SendByte('R'); UART3_SendByte(':');
+            for (int b = 7; b >= 0; b--) {
+                UART3_SendByte((d_gray & (1 << b)) ? '0' : '1');
+            }
+
+            UART3_SendByte(' '); UART3_SendByte('Y'); UART3_SendByte(':');
+            v = d_yaw;
+            if (v < 0) { UART3_SendByte('-'); v = -v; } else { UART3_SendByte('+'); }
+            UART3_SendByte('0' + (v / 100) % 10);
+            UART3_SendByte('0' + (v / 10) % 10);
+            UART3_SendByte('0' + (v % 10));
+
+            UART3_SendByte(' '); UART3_SendByte('G'); UART3_SendByte('Z'); UART3_SendByte(':');
+            v = d_gz;
+            if (v < 0) { UART3_SendByte('-'); v = -v; } else { UART3_SendByte('+'); }
+            UART3_SendByte('0' + (v / 10000) % 10);
+            UART3_SendByte('0' + (v / 1000) % 10);
+            UART3_SendByte('0' + (v / 100) % 10);
+            UART3_SendByte('0' + (v / 10) % 10);
+            UART3_SendByte('0' + (v % 10));
+
+            UART3_SendByte('\r'); UART3_SendByte('\n');
         }
     }
 }
-
