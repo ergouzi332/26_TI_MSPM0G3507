@@ -10,7 +10,7 @@ volatile uint32_t tick_ms = 0;
 void SysTick_Handler(void) { tick_ms++; }
 
 // === 脉冲 PID 参数 ===
-#define TARGET_PULSE    9           // PWM100 时 ~10 脉冲/20ms
+#define TARGET_PULSE    20
 #define PWM_FF          100.0f
 #define KP              5.0f
 #define KI              0.2f
