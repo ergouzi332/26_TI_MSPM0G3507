@@ -398,16 +398,16 @@
               <FileType>2</FileType>
               <FilePath>startup_mspm0g350x_uvision.s</FilePath>
             </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>HardWare</GroupName>
-          <Files>
             <File>
               <FileName>ti_msp_dl_config.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Src\ti_msp_dl_config.h</FilePath>
             </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>HardWare</GroupName>
+          <Files>
             <File>
               <FileName>MPU6050.c</FileName>
               <FileType>1</FileType>
@@ -467,16 +467,6 @@
               <FileName>BUZZER.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\HardWare\BUZZER.h</FilePath>
-            </File>
-            <File>
-              <FileName>Hardware.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\HardWare\Hardware.c</FilePath>
-            </File>
-            <File>
-              <FileName>Hardware.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\HardWare\Hardware.h</FilePath>
             </File>
             <File>
               <FileName>KEY.c</FileName>
