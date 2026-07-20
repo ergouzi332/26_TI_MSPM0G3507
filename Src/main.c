@@ -40,7 +40,11 @@ int main(void)
     uint16_t d_gray = 0;
     uint32_t last_20ms = 0, last_500ms = 0;
 
-    // ???????CH1(?bit0)~CH8(?bit7)?0=?
+    // gyro bias tracking
+    float gz_bias_sum = 0;
+    int gz_bias_cnt = 0;
+
+    // weights: CH1(bit0 left)~CH8(bit7 right), 0=black
     int8_t w[8] = {-7,-5,-3,-1,1,3,5,7};
 
     while (1)
@@ -55,7 +59,24 @@ int main(void)
             MPU6050_UpdateYawFromRaw(d_gz, 0.02f);
             d_yaw = (int16_t)(MPU6050_GetYaw() * 10.0f);
 
-            // ??
+            // bias tracking only when truly stationary
+            if (!motor_run) {
+                if (d_gz > -500 && d_gz < 500) {
+                    gz_bias_sum += d_gz;
+                    gz_bias_cnt++;
+                    if (gz_bias_cnt >= 50) {
+                        float new_offset = gz_bias_sum / gz_bias_cnt;
+                        MPU6050_SetGzOffset(new_offset);
+                        gz_bias_sum = 0; gz_bias_cnt = 0;
+                    }
+                } else {
+                    gz_bias_sum = 0; gz_bias_cnt = 0;
+                }
+            } else {
+                gz_bias_sum = 0; gz_bias_cnt = 0;
+            }
+
+            // KEY
             uint8_t key = KEY_Scan();
             if (key & KEY_1) {
                 if (!motor_run) {
@@ -71,25 +92,25 @@ int main(void)
                 Motor_GetLeftPulses(); Motor_GetRightPulses();
             }
 
-            // ???0=??1=??
+            // grayscale (0=black, 1=white)
             uint16_t line = Grayscale_ReadAll() & 0xFF;
             d_gray = line;
             int sum = 0;
             for (int i = 0; i < 8; i++) {
-                if ((line & (1 << i)) == 0) sum += w[i];  // 0=?
+                if ((line & (1 << i)) == 0) sum += w[i];
             }
             d_er = (int16_t)sum;
 
-            // ?? + ??
-            er_filt += ((float)d_er - er_filt) * 0.3f;
+            // filter + deadband
+            er_filt += ((float)d_er - er_filt) * 0.7f;
             if (fabsf(er_filt) < 2.0f) er_filt = 0.0f;
 
-            // ??PD
+            // line PD
             float diff_er = er_filt - last_er_filt;
             last_er_filt = er_filt;
             float steer = er_filt * KP_LINE + diff_er * KD_LINE;
 
-            // ????
+            // target speed
             int32_t targetL = TARGET_PULSE - (int32_t)(steer + 0.5f);
             int32_t targetR = TARGET_PULSE + (int32_t)(steer + 0.5f);
             if (targetL < TARGET_MIN) targetL = TARGET_MIN;
@@ -97,7 +118,7 @@ int main(void)
             if (targetR < TARGET_MIN) targetR = TARGET_MIN;
             if (targetR > TARGET_MAX) targetR = TARGET_MAX;
 
-            // ??P??
+            // speed P control
             if (motor_run) {
                 int32_t pL = (int32_t)Motor_GetLeftPulses();
                 d_pL = (int16_t)pL;
@@ -128,7 +149,7 @@ int main(void)
             d_pwmL = (uint16_t)pwmL; d_pwmR = (uint16_t)pwmR;
         }
 
-        // 500ms??
+        // 500ms UART
         if (now - last_500ms >= 500) {
             last_500ms = now;
             char b[80]; int p = 0;
