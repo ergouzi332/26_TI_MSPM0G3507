@@ -4,6 +4,8 @@
 #include <stdint.h>
 
 void Motor_Init(void);
+void Motor_PivotLeft(void);
+void Motor_TankLeft(void);
 void Motor_Stop(void);
 void Motor_SetPWM(uint16_t left, uint16_t right);
 void Motor_SetForward(void);

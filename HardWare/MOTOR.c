@@ -1,89 +1,89 @@
-#include "MOTOR.h"
+﻿#include "MOTOR.h"
 #include <ti/devices/msp/msp.h>
 #include <ti/driverlib/driverlib.h>
 #include "ti_msp_dl_config.h"
 
-// 编码器每转总脉冲数，电机单圈编码器脉冲值
+// 缂栫爜鍣ㄦ瘡杞€昏剦鍐叉暟锛岀數鏈哄崟鍦堢紪鐮佸櫒鑴夊啿鍊?
 #define PULSE_PER_REV  520
 
-// 左右轮编码器全局脉冲计数，中断内修改加volatile防止编译器优化
+// 宸﹀彸杞紪鐮佸櫒鍏ㄥ眬鑴夊啿璁℃暟锛屼腑鏂唴淇敼鍔爒olatile闃叉缂栬瘧鍣ㄤ紭鍖?
 volatile uint32_t enc_left = 0;
 volatile uint32_t enc_right = 0;
 
 /**
- * @brief GPIOA组中断服务函数，编码器AB相上升沿触发
- * 四路编码器引脚中断进入，每检测到边沿脉冲计数+1（四倍频计数逻辑）
+ * @brief GPIOA缁勪腑鏂湇鍔″嚱鏁帮紝缂栫爜鍣ˋB鐩镐笂鍗囨部瑙﹀彂
+ * 鍥涜矾缂栫爜鍣ㄥ紩鑴氫腑鏂繘鍏ワ紝姣忔娴嬪埌杈规部鑴夊啿璁℃暟+1锛堝洓鍊嶉璁℃暟閫昏緫锛?
  */
 void GROUP1_IRQHandler(void)
 {
-    // 读取本次触发的中断标志位
+    // 璇诲彇鏈瑙﹀彂鐨勪腑鏂爣蹇椾綅
     uint32_t flags = DL_GPIO_getEnabledInterruptStatus(GPIOA,
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
 
-    // 左轮编码器2A相边沿，左轮脉冲+1
+    // 宸﹁疆缂栫爜鍣?A鐩歌竟娌匡紝宸﹁疆鑴夊啿+1
     if (flags & GOIO_GET_GET_2A_PIN) { enc_left++; }
-    // 左轮编码器2B相边沿，左轮脉冲+1
+    // 宸﹁疆缂栫爜鍣?B鐩歌竟娌匡紝宸﹁疆鑴夊啿+1
     if (flags & GOIO_GET_GET_2B_PIN) { enc_left++; }
-    // 右轮编码器1A相边沿，右轮脉冲+1
+    // 鍙宠疆缂栫爜鍣?A鐩歌竟娌匡紝鍙宠疆鑴夊啿+1
     if (flags & GOIO_GET_GET_1A_PIN) { enc_right++; }
-    // 右轮编码器1B相边沿，右轮脉冲+1
+    // 鍙宠疆缂栫爜鍣?B鐩歌竟娌匡紝鍙宠疆鑴夊啿+1
     if (flags & GOIO_GET_GET_1B_PIN) { enc_right++; }
 
-    // 清除所有编码器引脚中断标志，否则会重复进中断
+    // 娓呴櫎鎵€鏈夌紪鐮佸櫒寮曡剼涓柇鏍囧織锛屽惁鍒欎細閲嶅杩涗腑鏂?
     DL_GPIO_clearInterruptStatus(GPIOA,
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
 }
 
 /**
- * @brief 电机底层初始化：PWM输出、方向控制IO、编码器中断配置
+ * @brief 鐢垫満搴曞眰鍒濆鍖栵細PWM杈撳嚭銆佹柟鍚戞帶鍒禝O銆佺紪鐮佸櫒涓柇閰嶇疆
  */
 void Motor_Init(void)
 {
-    // PWM分频配置，设置PWM时钟分频参数
+    // PWM鍒嗛閰嶇疆锛岃缃甈WM鏃堕挓鍒嗛鍙傛暟
     PWM_0_INST->COMMONREGS.CCPD = 0x03;
-    // 开启定时器比较输出使能
+    // 寮€鍚畾鏃跺櫒姣旇緝杈撳嚭浣胯兘
     PWM_0_INST->COUNTERREGS.OCTL_01[0] |= (1 << 5);
-    // 左右轮PWM初始占空比0，电机静止
+    // 宸﹀彸杞甈WM鍒濆鍗犵┖姣?锛岀數鏈洪潤姝?
     PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = 0;
     PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = 0;
-    // 启动PWM定时器开始计数
+    // 鍚姩PWM瀹氭椂鍣ㄥ紑濮嬭鏁?
     DL_TimerG_startCounter(PWM_0_INST);
 
-    // 电机方向控制引脚默认全部置高，上电刹车状态
+    // 鐢垫満鏂瑰悜鎺у埗寮曡剼榛樿鍏ㄩ儴缃珮锛屼笂鐢靛埞杞︾姸鎬?
     DL_GPIO_setPins(MOTOR_DIR_PORT,
         MOTOR_DIR_BIN_1_PIN | MOTOR_DIR_BIN_2_PIN |
         MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
 
-    // 清除编码器引脚残留中断标志
+    // 娓呴櫎缂栫爜鍣ㄥ紩鑴氭畫鐣欎腑鏂爣蹇?
     DL_GPIO_clearInterruptStatus(GPIOA,
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
-    // 使能四路编码器引脚GPIO中断
+    // 浣胯兘鍥涜矾缂栫爜鍣ㄥ紩鑴欸PIO涓柇
     DL_GPIO_enableInterrupt(GPIOA,
         GOIO_GET_GET_2A_PIN | GOIO_GET_GET_2B_PIN |
         GOIO_GET_GET_1A_PIN | GOIO_GET_GET_1B_PIN);
 
-    // 配置编码器引脚中断触发方式：上升沿触发
+    // 閰嶇疆缂栫爜鍣ㄥ紩鑴氫腑鏂Е鍙戞柟寮忥細涓婂崌娌胯Е鍙?
     DL_GPIO_setUpperPinsPolarity(GPIOA,
         DL_GPIO_PIN_26_EDGE_RISE |
         DL_GPIO_PIN_21_EDGE_RISE |
         DL_GPIO_PIN_27_EDGE_RISE |
         DL_GPIO_PIN_22_EDGE_RISE);
 
-    // 清除NVIC挂起中断，开启GPIOA中断，设置最高中断优先级0
+    // 娓呴櫎NVIC鎸傝捣涓柇锛屽紑鍚疓PIOA涓柇锛岃缃渶楂樹腑鏂紭鍏堢骇0
     NVIC_ClearPendingIRQ(GPIOA_INT_IRQn);
     NVIC_EnableIRQ(GPIOA_INT_IRQn);
     NVIC_SetPriority(GPIOA_INT_IRQn, 0);
 
-    // 上电清零左右轮编码器计数
+    // 涓婄數娓呴浂宸﹀彸杞紪鐮佸櫒璁℃暟
     enc_left = 0; enc_right = 0;
 }
 
 /**
- * @brief 设置电机正转前进模式
- * AIN1/BIN1拉低，AIN2/BIN2拉高，左右轮同向前进
+ * @brief 璁剧疆鐢垫満姝ｈ浆鍓嶈繘妯″紡
+ * AIN1/BIN1鎷変綆锛孉IN2/BIN2鎷夐珮锛屽乏鍙宠疆鍚屽悜鍓嶈繘
  */
 void Motor_SetForward(void)
 {
@@ -92,8 +92,8 @@ void Motor_SetForward(void)
 }
 
 /**
- * @brief 设置电机刹车模式
- * 四路方向引脚全部拉高，H桥上下管同时导通，电机短接制动
+ * @brief 璁剧疆鐢垫満鍒硅溅妯″紡
+ * 鍥涜矾鏂瑰悜寮曡剼鍏ㄩ儴鎷夐珮锛孒妗ヤ笂涓嬬鍚屾椂瀵奸€氾紝鐢垫満鐭帴鍒跺姩
  */
 void Motor_SetBrake(void)
 {
@@ -103,23 +103,23 @@ void Motor_SetBrake(void)
 }
 
 /**
- * @brief 读取并清零左轮编码器脉冲（读取本次20ms周期累计脉冲）
- * @return 本次周期左轮总脉冲数
- * 关中断防止读取过程中脉冲计数被中断修改，读完立即清零
+ * @brief 璇诲彇骞舵竻闆跺乏杞紪鐮佸櫒鑴夊啿锛堣鍙栨湰娆?0ms鍛ㄦ湡绱鑴夊啿锛?
+ * @return 鏈鍛ㄦ湡宸﹁疆鎬昏剦鍐叉暟
+ * 鍏充腑鏂槻姝㈣鍙栬繃绋嬩腑鑴夊啿璁℃暟琚腑鏂慨鏀癸紝璇诲畬绔嬪嵆娓呴浂
  */
 uint32_t Motor_GetLeftPulses(void)
 {
     uint32_t val;
-    __disable_irq();    // 关闭全局中断，保证原子操作
+    __disable_irq();    // 鍏抽棴鍏ㄥ眬涓柇锛屼繚璇佸師瀛愭搷浣?
     val = enc_left;
     enc_left = 0;
-    __enable_irq();     // 恢复全局中断
+    __enable_irq();     // 鎭㈠鍏ㄥ眬涓柇
     return val;
 }
 
 /**
- * @brief 读取并清零右轮编码器脉冲
- * @return 本次周期右轮总脉冲数
+ * @brief 璇诲彇骞舵竻闆跺彸杞紪鐮佸櫒鑴夊啿
+ * @return 鏈鍛ㄦ湡鍙宠疆鎬昏剦鍐叉暟
  */
 uint32_t Motor_GetRightPulses(void)
 {
@@ -132,23 +132,43 @@ uint32_t Motor_GetRightPulses(void)
 }
 
 /**
- * @brief 设置左右轮PWM占空比输出
- * @param left 左轮PWM数值 0~1000
- * @param right 右轮PWM数值 0~1000
- * 内部限幅，超过1000强制封顶1000
+ * @brief 璁剧疆宸﹀彸杞甈WM鍗犵┖姣旇緭鍑?
+ * @param left 宸﹁疆PWM鏁板€?0~1000
+ * @param right 鍙宠疆PWM鏁板€?0~1000
+ * 鍐呴儴闄愬箙锛岃秴杩?000寮哄埗灏侀《1000
  */
 void Motor_SetPWM(uint16_t left, uint16_t right)
 {
     if (left  > 1000) left  = 1000;
     if (right > 1000) right = 1000;
-    // CC1对应左轮，CC0对应右轮
+    // CC1瀵瑰簲宸﹁疆锛孋C0瀵瑰簲鍙宠疆
     PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_1_INDEX] = left;
     PWM_0_INST->COUNTERREGS.CC_01[DL_TIMER_CC_0_INDEX] = right;
 }
 
 /**
- * @brief 整车停止函数：刹车+PWM清零
+ * @brief 鏁磋溅鍋滄鍑芥暟锛氬埞杞?PWM娓呴浂
  */
+
+void Motor_PivotLeft(void)
+{
+    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_AIN_1_PIN | MOTOR_DIR_AIN_2_PIN);
+    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN);
+    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_2_PIN);
+}
+
+/**
+ * @brief 坦克左转：左轮反转、右轮正转，原地旋转
+ * AIN1=1, AIN2=0 -> 左轮反转; BIN1=0, BIN2=1 -> 右轮正转
+ */
+void Motor_TankLeft(void)
+{
+    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_AIN_1_PIN);
+    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_AIN_2_PIN);
+    DL_GPIO_clearPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_1_PIN);
+    DL_GPIO_setPins(MOTOR_DIR_PORT, MOTOR_DIR_BIN_2_PIN);
+}
+
 void Motor_Stop(void)
 {
     Motor_SetBrake();
