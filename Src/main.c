@@ -59,6 +59,7 @@ int main(void)
 
     // 8路灰度权重数组：CH0最左(-7) ~ CH7最右(+7)；黑线=0参与计算，白线=1不计入
     int8_t w[8] = {-7,-5,-3,-1,1,3,5,7};
+    uint8_t sys_st = 0;
 
     while (1) // 主循环死循环
     {
@@ -104,21 +105,16 @@ int main(void)
             // KEY1按下：启动小车，清空积分项，重置编码器脉冲基准
             if (key & KEY_1)
             {
-                if (!motor_run)
-                {
-                    Motor_SetForward(); motor_run = 1;
-                    integralL = 0.0f; integralR = 0.0f;
-                    Motor_GetLeftPulses(); Motor_GetRightPulses();
-                }
-            }
-            // KEY2按下：刹车停机，PWM清零，复位所有控制变量
-            if (key & KEY_2)
-            {
-                Motor_SetBrake(); Motor_SetPWM(0, 0);
-                motor_run = 0; pwmL = 0; pwmR = 0;
+                sys_st = 1; motor_run = 1; Motor_SetForward();
                 integralL = 0.0f; integralR = 0.0f;
                 Motor_GetLeftPulses(); Motor_GetRightPulses();
             }
+            // KEY2按下：刹车停机，PWM清零，复位所有控制变量
+            if (key & KEY_3)
+            {
+                sys_st = 0; motor_run = 0; Motor_Stop();
+            }
+            // KEY2: square tracking (TODO)
 
             // 4. 读取8路灰度传感器，计算循迹误差
             uint16_t line = Grayscale_ReadAll() & 0xFF;
@@ -154,8 +150,16 @@ int main(void)
             if (targetR > TARGET_MAX) targetR = TARGET_MAX;
 
             // 9. 电机运行时执行速度环PI闭环控制
-            if (motor_run)
+            switch (sys_st)
             {
+                case 0:
+                    
+                d_pL = 0; d_pR = 0;
+            
+                    break;
+                case 1:
+                {
+
                 // 左轮速度PI
                 int32_t pL = (int32_t)Motor_GetLeftPulses();
                 d_pL = (int16_t)pL;
@@ -185,12 +189,15 @@ int main(void)
                 pwmL = (int16_t)(outL + 0.5f);
                 pwmR = (int16_t)(outR + 0.5f);
                 Motor_SetPWM((uint16_t)pwmL, (uint16_t)pwmR);
-            }
-            else // 电机停止，清空脉冲缓存
-            {
+            
+                    break;
+                }
+                default:
+                    
                 d_pL = 0; d_pR = 0;
+            
+                    break;
             }
-            // 缓存当前PWM值供串口打印
             d_pwmL = (uint16_t)pwmL; d_pwmR = (uint16_t)pwmR;
         }
 
